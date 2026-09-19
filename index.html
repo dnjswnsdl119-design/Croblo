@@ -673,7 +673,8 @@ const SETS = {
     },
     bonuses:[
       { count:2, stats:{atk:5, def:3},        desc:'2세트: 공격력+5, 방어력+3' },
-      { count:3, stats:{atk:10, hp:40, def:5},desc:'3세트: 공격력+10, 방어력+5, 체력+40' },
+      { count:3, stats:{atk:10, hp:40, def:5},desc:'3세트: 공격력+10, 방어력+5, 체력+40, 스킬 재사용시간 10% 감소',
+        special:{type:'cdr', value:0.1} },
     ],
   },
   shadow: {
@@ -685,7 +686,8 @@ const SETS = {
     },
     bonuses:[
       { count:2, stats:{crit:8, atk:4},         desc:'2세트: 치명타+8%, 공격력+4' },
-      { count:3, stats:{crit:14, atk:8, hp:15}, desc:'3세트: 치명타+14%, 공격력+8, 체력+15' },
+      { count:3, stats:{crit:14, atk:8, hp:15}, desc:'3세트: 치명타+14%, 공격력+8, 체력+15, 적중 시 20% 확률로 대상 빙결',
+        special:{type:'onhit_chill', chance:0.2, duration:2} },
     ],
   },
   guardian: {
@@ -697,7 +699,8 @@ const SETS = {
     },
     bonuses:[
       { count:2, stats:{def:8, hp:30},          desc:'2세트: 방어력+8, 체력+30' },
-      { count:3, stats:{def:15, hp:60, atk:4},  desc:'3세트: 방어력+15, 체력+60, 공격력+4' },
+      { count:3, stats:{def:15, hp:60, atk:4},  desc:'3세트: 방어력+15, 체력+60, 공격력+4, 체력 30% 이하일 때 방어력 50% 추가 증가',
+        special:{type:'lowhp_defense', threshold:0.3, bonus:0.5} },
     ],
   },
   abyss: {
@@ -712,7 +715,8 @@ const SETS = {
     bonuses:[
       { count:2, stats:{atk:6, def:4},                    desc:'2세트: 공격력+6, 방어력+4' },
       { count:3, stats:{hp:40, crit:5},                   desc:'3세트: 체력+40, 치명타+5%' },
-      { count:5, stats:{atk:16, def:12, hp:60, crit:8},   desc:'5세트: 공격력+16, 방어력+12, 체력+60, 치명타+8%' },
+      { count:5, stats:{atk:16, def:12, hp:60, crit:8},   desc:'5세트: 공격력+16, 방어력+12, 체력+60, 치명타+8%, 처치 시 35% 확률로 주변에 폭발(공격력의 50%) 발생',
+        special:{type:'onkill_explosion', chance:0.35, radius:3.2, mult:0.5} },
     ],
   },
 };
@@ -1495,6 +1499,7 @@ function getTotalStats(){
     if(item && item.setId) setCounts[item.setId] = (setCounts[item.setId]||0)+1;
   }
   const activeSetBonuses = [];
+  const setSpecials = [];
   for(const setId in setCounts){
     const setDef = SETS[setId];
     for(const bonus of setDef.bonuses){
@@ -1502,6 +1507,7 @@ function getTotalStats(){
         stats.atk += bonus.stats.atk||0; stats.def += bonus.stats.def||0;
         stats.hp += bonus.stats.hp||0; stats.crit += bonus.stats.crit||0;
         activeSetBonuses.push(`${setDef.name} ${bonus.desc}`);
+        if(bonus.special) setSpecials.push(bonus.special);
       }
     }
   }
@@ -1513,7 +1519,13 @@ function getTotalStats(){
     stats.def = Math.round(stats.def*rebirthMult);
     stats.hp = Math.round(stats.hp*rebirthMult);
   }
+  // 세트 "체력 30% 이하" 발동형 특수 효과(수호자 세트): 최종 최대체력 기준으로 판정하므로 스탯 계산 맨 마지막에 적용
+  const lowHpSpecial = setSpecials.find(sp=>sp.type==='lowhp_defense');
+  if(lowHpSpecial && player.hp <= stats.hp*lowHpSpecial.threshold){
+    stats.def = Math.round(stats.def*(1+lowHpSpecial.bonus));
+  }
   stats._activeSetBonuses = activeSetBonuses;
+  stats._setSpecials = setSpecials;
   return stats;
 }
 
@@ -1895,12 +1907,15 @@ function applyGrowthLifesteal(dmg){
   player.hp = Math.min(getTotalStats().hp, player.hp + heal);
   refreshHUD();
 }
-// 기본공격/스킬 재사용시간 배율: 성장무기 "폭풍의 각인" 경로 + 스킬트리 "숙련" 루트 패시브(s2cx 등)를 함께 반영
+// 기본공격/스킬 재사용시간 배율: 성장무기 "폭풍의 각인" 경로 + 스킬트리 "숙련" 루트 패시브(s2cx 등) + 세트효과(용사의 세트 등)를 함께 반영
 function getGrowthAtkSpeedMult(){
   const w = player.equipment.weapon;
   let mult = (w && w.isGrowthWeapon && w.growthPath === 'storm') ? GROWTH_PATHS.storm.atkSpeedMult : 1;
-  const passiveBonus = getTotalStats()._atkSpeedBonus || 0;
+  const stats = getTotalStats();
+  const passiveBonus = stats._atkSpeedBonus || 0;
   mult *= (1 - passiveBonus);
+  const cdrSpecial = stats._setSpecials && stats._setSpecials.find(sp=>sp.type==='cdr');
+  if(cdrSpecial) mult *= (1 - cdrSpecial.value);
   return mult;
 }
 
@@ -2090,6 +2105,7 @@ function useClassSkill(slotKey){
     spawnDamageNumberAt(wp, dmg, true, '#ff8a2a');
     updateMonsterBar(target);
     checkBossPhaseTransition(target);
+    applySetOnHitEffects(target, stats);
     flashSkillEffect(target.pos, 0xff8a2a, 1.6);
     if(skill.type==='ranged_single'){
       spawnCastBolt(playerState.pos, target.pos, 0x8a5aff);
@@ -2112,6 +2128,7 @@ function useClassSkill(slotKey){
         spawnDamageNumberAt(wp2, dmg2, isCrit2, '#ff8a2a');
         updateMonsterBar(m);
         checkBossPhaseTransition(m);
+        applySetOnHitEffects(m, stats);
         if(skill.type==='ranged_single') spawnCastBolt(playerState.pos, m.pos, 0x8a5aff);
         else flashSkillEffect(m.pos, 0xff8a2a, 1.2);
         if(m.hp <= 0) killMonster(m);
@@ -2135,6 +2152,7 @@ function useClassSkill(slotKey){
       spawnDamageNumberAt(wp, dmg, isCrit, '#4ad0ff');
       updateMonsterBar(m);
       checkBossPhaseTransition(m);
+      applySetOnHitEffects(m, stats);
       if(m.hp <= 0){ killMonster(m); }
       else if(skill.type==='melee_aoe') applyBurn(m, Math.max(1,Math.round(stats.atk*0.15)), 4, 0.8); // 근접 광역: 화상 지속피해
       else if(skill.type==='ranged_aoe') applyChill(m, 2); // 원거리 광역: 범위 빙결
@@ -4755,6 +4773,7 @@ function playerAttack(monster){
   spawnDamageNumberAt(worldPos, realDmg, isCrit);
   updateMonsterBar(monster);
   checkBossPhaseTransition(monster);
+  applySetOnHitEffects(monster, stats);
   if(isCrit) SFX.crit(); else SFX.hit();
   if(monster.hp > 0) SFX.monsterHurt();
   if(getClassDef()?.ranged) spawnCastBolt(playerState.pos, monster.pos, 0x8a5aff);
@@ -4769,8 +4788,13 @@ function playerAttack(monster){
 }
 
 function killMonster(monster){
-  if(isChilled(monster)) triggerFrostNova(monster);
+  // 냉기 폭발/세트 폭발 등 연쇄 처치 시 같은 몬스터가 중복 처리(경험치/골드/드랍 중복 지급)되지 않도록 방지
+  if(monster.dead) return;
+  monster.dead = true;
   monster.alive = false;
+  if(isChilled(monster)) triggerFrostNova(monster);
+  const explosionSpecial = getTotalStats()._setSpecials?.find(sp=>sp.type==='onkill_explosion');
+  if(explosionSpecial && Math.random() < explosionSpecial.chance) triggerSetExplosion(monster, explosionSpecial);
   SFX.monsterDeath();
   const dropX = monster.pos.x, dropZ = monster.pos.z;
   const mLevel = monster.level || 1;
@@ -4869,6 +4893,13 @@ function applyChill(m, durationSec){
   }
 }
 function isChilled(m){ return !!(m.chillUntil && performance.now() < m.chillUntil); }
+// 세트효과(그림자 세트 등): 공격 적중 시 일정 확률로 대상에게 추가 상태이상을 건다
+function applySetOnHitEffects(target, stats){
+  if(!target || !target.alive || target.hp <= 0 || !stats._setSpecials) return;
+  stats._setSpecials.forEach(sp=>{
+    if(sp.type === 'onhit_chill' && Math.random() < sp.chance) applyChill(target, sp.duration||2);
+  });
+}
 function applyBurn(m, dmgPerTick, ticks, tickInterval){
   if(!m || !m.alive) return;
   m.burnTicksLeft = ticks;
@@ -4913,6 +4944,24 @@ function triggerFrostNova(monster){
     updateMonsterBar(m2);
     checkBossPhaseTransition(m2);
     applyChill(m2, 2);
+    if(m2.hp <= 0) killMonster(m2);
+  });
+}
+// 세트효과(심연 세트): 몬스터 처치 시 일정 확률로 주변에 폭발을 일으켜 추가 피해를 준다
+function triggerSetExplosion(monster, sp){
+  const stats = getTotalStats();
+  const radius = sp.radius || 3.2;
+  const nearby = monsters.filter(m2=>m2.alive && m2!==monster && monster.pos.distanceTo(m2.pos) < radius);
+  if(nearby.length === 0) return;
+  flashSkillEffect(monster.pos, 0xb266ff, radius);
+  SFX.crit();
+  nearby.forEach(m2=>{
+    const dmg = Math.max(1, Math.round(stats.atk*(sp.mult||0.5)));
+    m2.hp -= dmg;
+    const wp = m2.pos.clone(); wp.y = 2.0*m2.def.scale;
+    spawnDamageNumberAt(wp, dmg, false, '#b266ff');
+    updateMonsterBar(m2);
+    checkBossPhaseTransition(m2);
     if(m2.hp <= 0) killMonster(m2);
   });
 }
