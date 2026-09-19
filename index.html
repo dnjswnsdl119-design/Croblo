@@ -494,13 +494,14 @@
 
   <div id="combine-panel" class="panel hidden">
     <div class="ql-header">
-      <h2>조합</h2>
+      <h2>조합 & 제작</h2>
       <button class="ql-close" id="combine-close">✕</button>
     </div>
     <div id="combine-tabs">
       <button class="combine-tab active" data-tab="gem">보석 조합</button>
       <button class="combine-tab" data-tab="rune">룬 조합</button>
       <button class="combine-tab" data-tab="fusion">보석+룬 융합</button>
+      <button class="combine-tab" data-tab="craft">아이템 제작</button>
     </div>
     <div id="combine-body"></div>
   </div>
@@ -615,10 +616,12 @@ const RARITY = {
   rune:    { key:'rune',    label:'룬',     color:'#c77dff', mult:1.0,  weight:0   },
   gem:     { key:'gem',     label:'보석',   color:'#ff8ccf', mult:1.0,  weight:0   },
   fusion:  { key:'fusion',  label:'각인석', color:'#ffb347', mult:1.0,  weight:0   },
+  material:{ key:'material',label:'재료',   color:'#a0a0a0', mult:1.0,  weight:0   },
+  crafted: { key:'crafted', label:'제작',   color:'#6adfff', mult:2.1,  weight:0   },
 };
 
-const SLOT_LABEL = { weapon:'무기', armor:'방어구', accessory:'장신구', helmet:'투구', gloves:'장갑', boots:'신발', belt:'벨트', rune:'룬', gem:'보석', fusion:'각인석' };
-const SLOT_ICON = { weapon:'⚔️', armor:'🛡️', accessory:'💍', helmet:'⛑️', gloves:'🧤', boots:'👢', belt:'🎗️', rune:'🔮', gem:'💎', fusion:'✨' };
+const SLOT_LABEL = { weapon:'무기', armor:'방어구', accessory:'장신구', helmet:'투구', gloves:'장갑', boots:'신발', belt:'벨트', rune:'룬', gem:'보석', fusion:'각인석', material:'재료' };
+const SLOT_ICON = { weapon:'⚔️', armor:'🛡️', accessory:'💍', helmet:'⛑️', gloves:'🧤', boots:'👢', belt:'🎗️', rune:'🔮', gem:'💎', fusion:'✨', material:'🧩' };
 const EQUIP_SLOTS = ['weapon','helmet','armor','gloves','belt','boots','accessory'];
 
 // 세트 아이템 정의: 각 부위별 고정 아이템 + 세트 보너스
@@ -685,6 +688,27 @@ const UNIQUES = [
   { name:'시간을 거스른 장화', slot:'boots',   base:{hp:30, def:6},        flavor:'한 걸음마다 시간이 살짝 어긋난다.' },
   { name:'파멸을 움켜쥔 건틀릿', slot:'gloves', base:{atk:14, crit:5},     flavor:'쥐는 것마다 결국엔 부서져 내렸다.' },
   { name:'윤회의 허리띠',      slot:'belt',    base:{hp:45, def:8},        flavor:'끊어져도 몇 번이고 다시 이어졌다.' },
+];
+
+// 제작 재료: 몬스터 처치 시 해당 몬스터의 구역 등급에 맞는 재료가 확률적으로 드랍된다
+const CRAFT_MATERIALS = {
+  leather:  { id:'leather',  name:'낡은 가죽 조각', tier:1, color:'#a08050' },
+  fragment: { id:'fragment', name:'심연의 파편',   tier:2, color:'#8a5fd8' },
+  relic:    { id:'relic',    name:'고대의 유물',   tier:3, color:'#c9a227' },
+};
+const MONSTER_MATERIAL_TIER = {
+  goblin:1, wolf:1, archer:1, orc:1, chief:1, orclord:1,
+  wraith:2, sentinel:2, tentacle:2, abysslord:2, drowned:2, seaghost:2,
+  sandwraith:3, scarab:3, pharaoh:3, pirateking:3,
+};
+// 제작 레시피: 재료 + 골드로 확정 스탯의 전용 장비를 제작한다 (등급 "제작" - 희귀보다 강하고 세트/유니크보다는 약함)
+const CRAFT_RECIPES = [
+  { id:'craft_sword1', name:'수선한 강철 대검',   slot:'weapon',    minLevel:3,  cost:80,  materials:{leather:5}, base:{atk:9, crit:1},        flavor:'낡은 가죽으로 손잡이를 감싼 튼튼한 대검.' },
+  { id:'craft_armor1', name:'가죽 누비 갑옷',     slot:'armor',     minLevel:3,  cost:80,  materials:{leather:5}, base:{def:7, hp:15},         flavor:'여러 겹의 가죽을 덧대 만든 갑옷.' },
+  { id:'craft_ring1',  name:'파편의 인장',        slot:'accessory', minLevel:12, cost:220, materials:{fragment:5}, base:{atk:6, crit:2, hp:10}, flavor:'심연의 파편이 희미하게 진동한다.' },
+  { id:'craft_helm1',  name:'파편 응결의 투구',   slot:'helmet',    minLevel:12, cost:220, materials:{fragment:5}, base:{def:9, hp:20},         flavor:'심연의 냉기가 서려 있다.' },
+  { id:'craft_weapon2',name:'고대의 유물창',      slot:'weapon',    minLevel:20, cost:480, materials:{relic:6},   base:{atk:16, crit:3},       flavor:'고대 문명이 남긴 마지막 유산.' },
+  { id:'craft_boots1', name:'유물의 경보화',      slot:'boots',     minLevel:20, cost:480, materials:{relic:6},   base:{def:10, hp:30},        flavor:'유물의 힘이 발걸음을 가볍게 한다.' },
 ];
 
 const NORMAL_NAMES = {
@@ -857,7 +881,7 @@ function weightedRarity(monsterLevel){
 let itemUid = 1;
 let gameLoaded = false; // loadGame()이 끝나기 전까지 저장을 막아 세이브 파일이 덮어써지는 것을 방지
 
-const SOCKET_COUNT_BY_RARITY = { normal:0, magic:1, rare:2, set:4, unique:6 };
+const SOCKET_COUNT_BY_RARITY = { normal:0, magic:1, rare:2, set:4, unique:6, crafted:3 };
 
 function createRandomItem(monsterLevel){
   const rarityKey = weightedRarity(monsterLevel);
@@ -978,6 +1002,15 @@ function dropRandomGem(x, z, monsterLevel){
   spawnLoot(item, x, z);
 }
 
+// 제작 재료 아이템
+function createMaterialItem(materialId){
+  const m = CRAFT_MATERIALS[materialId];
+  return { uid:itemUid++, name:m.name, slot:'material', rarity:'material', materialId, base:{}, enhance:0 };
+}
+function dropMaterial(materialId, x, z){
+  spawnLoot(createMaterialItem(materialId), x, z);
+}
+
 // 보석 + 룬 융합: 각각의 스탯을 하나로 합친 "각인석" 생성 (조합 시스템)
 function computeFusionStats(gemItem, runeItem){
   const g = GEMS[gemItem.gemId];
@@ -1008,7 +1041,7 @@ function getScaledStats(item){
 }
 
 // 장비 비교용 대략적인 "전투력" 점수: 서로 다른 스탯 구성의 장비를 대충 비교하기 위한 가중합
-const SOCKETABLE_SLOTS = ['rune','gem','fusion'];
+const SOCKETABLE_SLOTS = ['rune','gem','fusion','material'];
 function computeItemPower(item){
   if(!item || SOCKETABLE_SLOTS.includes(item.slot)) return 0;
   const s = getScaledStats(item);
@@ -1078,8 +1111,8 @@ const STATUS_EFFECT_LABELS = {
 const REBIRTH_LEVEL = 20;
 const REBIRTH_BONUS_PCT = 8; // 환생 1회당 영구 능력치 증가율(%)
 const MAX_INVENTORY = 100;
-const DISASSEMBLE_YIELD = { normal:1, magic:2, rare:3, set:4, unique:5 };
-const SELL_VALUE = { normal:8, magic:20, rare:45, set:70, unique:110, rune:25 };
+const DISASSEMBLE_YIELD = { normal:1, magic:2, rare:3, set:4, unique:5, crafted:4 };
+const SELL_VALUE = { normal:8, magic:20, rare:45, set:70, unique:110, rune:25, crafted:60, material:12 };
 const GEM_SELL_VALUE = { chipped:6, normal:14, flawless:30, perfect:60 };
 function getSellValue(item){
   if(item.slot === 'gem') return GEM_SELL_VALUE[item.tier] || 6;
@@ -2103,7 +2136,7 @@ function removeMonster(m){
 
 let lootDrops = []; // {item, mesh, pos}
 
-const RARITY_TIER = { normal:0, magic:1, rare:2, set:3, unique:4 };
+const RARITY_TIER = { normal:0, magic:1, rare:2, crafted:3, set:4, unique:5 };
 
 function spawnRarityBurst(x, z, colorHex){
   const count = 12;
@@ -3781,6 +3814,38 @@ function splitRune(runeId){
   renderInventory(); renderCombinePanel(); refreshHUD(); saveGame(true);
 }
 
+/* ---------------------------- 아이템 제작 ---------------------------- */
+
+function getMaterialCount(materialId){
+  return player.inventory.filter(i=>i.slot==='material' && i.materialId===materialId).length;
+}
+function canCraft(recipe){
+  if(player.level < recipe.minLevel) return false;
+  if(player.gold < recipe.cost) return false;
+  return Object.entries(recipe.materials).every(([matId,qty])=>getMaterialCount(matId)>=qty);
+}
+function craftItem(recipeId){
+  const recipe = CRAFT_RECIPES.find(r=>r.id===recipeId);
+  if(!recipe || !canCraft(recipe)) return;
+  Object.entries(recipe.materials).forEach(([matId,qty])=>{
+    let remaining = qty;
+    player.inventory = player.inventory.filter(i=>{
+      if(remaining>0 && i.slot==='material' && i.materialId===matId){ remaining--; return false; }
+      return true;
+    });
+  });
+  player.gold -= recipe.cost;
+  const item = {
+    uid:itemUid++, name:recipe.name, slot:recipe.slot, rarity:'crafted',
+    base:{...recipe.base}, flavor:recipe.flavor, enhance:0,
+    sockets: SOCKET_COUNT_BY_RARITY.crafted, runes:[],
+  };
+  if(!addItemToInventory(item)) { player.gold += recipe.cost; Object.entries(recipe.materials).forEach(([matId,qty])=>{ for(let i=0;i<qty;i++) player.inventory.push(createMaterialItem(matId)); }); return; }
+  spawnToast(`${recipe.name} 제작 완료!`, '#5cff8a');
+  SFX.enhanceSuccess();
+  refreshHUD(); renderInventory(); renderCombinePanel(); saveGame(true);
+}
+
 // 상급 융합: 보석 2개 + 룬 1개 → 더 강력한 각인석
 function computeAdvancedFusionStats(gemA, gemB, runeItem){
   const rs = RUNES[runeItem.runeId].stats;
@@ -4039,7 +4104,43 @@ function renderCombineFusionTab(){
 function renderCombinePanel(){
   if(combineActiveTab==='gem') renderCombineGemTab();
   else if(combineActiveTab==='rune') renderCombineRuneTab();
-  else renderCombineFusionTab();
+  else if(combineActiveTab==='fusion') renderCombineFusionTab();
+  else renderCraftTab();
+}
+
+function renderCraftTab(){
+  const body = document.getElementById('combine-body');
+  let html = '<div class="combine-section-title">몬스터가 드랍하는 재료(가죽 조각·심연의 파편·고대의 유물)와 골드로 전용 장비를 제작합니다.</div>';
+  html += CRAFT_RECIPES.map(recipe=>{
+    const matLines = Object.entries(recipe.materials).map(([matId,qty])=>{
+      const mat = CRAFT_MATERIALS[matId];
+      const have = getMaterialCount(matId);
+      const met = have >= qty;
+      return `<span style="color:${met?'#bde0bd':'#ff8a8a'};">${mat.name} ${have}/${qty}</span>`;
+    }).join(', ');
+    const statsText = Object.entries(recipe.base).map(([k,v])=>{
+      const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
+      return `${labels[k]||k} +${v}${k==='crit'?'%':''}`;
+    }).join(' · ');
+    const levelMet = player.level >= recipe.minLevel;
+    const goldMet = player.gold >= recipe.cost;
+    const ok = canCraft(recipe);
+    return `<div class="combine-row" style="align-items:flex-start;">
+      <div class="combine-row-info">
+        <div class="combine-row-name" style="color:${RARITY.crafted.color};">${recipe.name} <span style="color:#999;font-weight:normal;">(${SLOT_LABEL[recipe.slot]})</span></div>
+        <div class="combine-row-desc">${statsText}</div>
+        <div class="combine-row-desc" style="margin-top:4px;">${recipe.flavor}</div>
+        <div class="combine-row-desc" style="margin-top:4px;">재료: ${matLines}</div>
+        <div class="combine-row-desc ${levelMet?'':'unmet'}" style="${levelMet?'':'color:#ff8a8a;'}">필요 레벨: Lv.${recipe.minLevel}</div>
+        <div class="combine-row-desc" style="${goldMet?'':'color:#ff8a8a;'}">비용: ${recipe.cost}G</div>
+      </div>
+      <button class="combine-row-btn" data-craft="${recipe.id}" ${ok?'':'disabled'}>제작하기</button>
+    </div>`;
+  }).join('');
+  body.innerHTML = html;
+  body.querySelectorAll('.combine-row-btn[data-craft]').forEach(btn=>{
+    btn.addEventListener('click', ()=> craftItem(btn.dataset.craft));
+  });
 }
 
 function toggleCombinePanel(){
@@ -4262,6 +4363,16 @@ function killMonster(monster){
   }
   if(Math.random() < (monster.def.isBoss ? 0.5 : Math.min(0.3, 0.1*dropFactor))){
     dropRandomGem(dropX + rand(-0.7,0.7), dropZ + rand(-0.7,0.7), mLevel);
+  }
+  // 제작 재료 드랍 (몬스터가 속한 구역 등급의 재료)
+  const matTier = MONSTER_MATERIAL_TIER[monster.type];
+  if(matTier){
+    const matDropChance = monster.def.isBoss ? 1.0 : 0.22;
+    if(Math.random() < matDropChance){
+      const matId = Object.values(CRAFT_MATERIALS).find(m=>m.tier===matTier).id;
+      const qty = monster.def.isBoss ? randi(2,3) : 1;
+      for(let i=0;i<qty;i++) dropMaterial(matId, dropX + rand(-0.6,0.6), dropZ + rand(-0.6,0.6));
+    }
   }
   if(monster.type === 'chief' && !player.hasDungeonKey){
     player.hasDungeonKey = true;
@@ -5075,15 +5186,17 @@ function refreshInventoryIfOpen(){
 }
 
 // 인벤토리 표시 정렬/스택: 종류별 -> 등급(높은 순)으로 묶고, 보석/룬처럼 같은 종류+등급이 겹치는 아이템은 개수로 묶어 표시한다
-const INV_TYPE_ORDER = ['weapon','armor','helmet','gloves','belt','boots','accessory','rune','gem','fusion'];
+const INV_TYPE_ORDER = ['weapon','armor','helmet','gloves','belt','boots','accessory','rune','gem','fusion','material'];
 function getStackKey(item){
   if(item.slot === 'gem') return `gem_${item.gemId}_${item.tier}`;
   if(item.slot === 'rune') return `rune_${item.runeId}`;
+  if(item.slot === 'material') return `material_${item.materialId}`;
   return null; // 장비/유니크/각인석 등은 개체별로 다른 옵션을 가질 수 있어 스택하지 않음
 }
 function invRarityRank(item){
   if(item.slot === 'gem') return GEM_TIER_MULT[item.tier] || 0;
   if(item.slot === 'rune') return RUNE_ORDER.indexOf(item.runeId);
+  if(item.slot === 'material') return CRAFT_MATERIALS[item.materialId].tier;
   return RARITY_TIER[item.rarity] ?? 0;
 }
 // 스택 가능한 아이템(보석/룬)은 같은 종류+등급이 이미 있으면 용량을 추가로 소모하지 않는다
@@ -5162,7 +5275,7 @@ function renderInventory(){
     div.className = 'inv-slot';
     if(item){
       div.classList.add('filled');
-      const rc = item.slot === 'gem' ? GEMS[item.gemId].color : RARITY[item.rarity].color;
+      const rc = item.slot === 'gem' ? GEMS[item.gemId].color : item.slot === 'material' ? CRAFT_MATERIALS[item.materialId].color : RARITY[item.rarity].color;
       div.style.borderColor = rc;
       div.style.setProperty('--slot-tint', hexToRgba(rc, 0.16));
       const iconDiv = document.createElement('div');
@@ -5539,7 +5652,7 @@ function showTooltip(e, item){
   tooltipEl.style.display = 'block';
   tooltipEl.style.left = (e.clientX+16)+'px';
   tooltipEl.style.top = (e.clientY+8)+'px';
-  const rc = item.slot === 'gem' ? GEMS[item.gemId].color : RARITY[item.rarity].color;
+  const rc = item.slot === 'gem' ? GEMS[item.gemId].color : item.slot === 'material' ? CRAFT_MATERIALS[item.materialId].color : RARITY[item.rarity].color;
   let statsHtml, typeLine;
   if(item.slot === 'rune'){
     const rd = RUNES[item.runeId];
@@ -5551,6 +5664,9 @@ function showTooltip(e, item){
     const val = gemStatValue(item.gemId, item.tier);
     statsHtml = `${GEM_STAT_LABELS[g.stat]} +${g.stat==='crit'?val.toFixed(1):Math.round(val)}${g.stat==='crit'?'%':''}`;
     typeLine = `${SLOT_LABEL[item.slot]} · ${GEM_TIER_LABELS[item.tier]}`;
+  } else if(item.slot === 'material'){
+    statsHtml = '아이템 제작에 사용되는 재료입니다. (G: 조합 및 제작)';
+    typeLine = `${SLOT_LABEL[item.slot]} · ${CRAFT_MATERIALS[item.materialId].tier}단계`;
   } else {
     statsHtml = itemStatsText(item);
     typeLine = `${SLOT_LABEL[item.slot]} · ${RARITY[item.rarity].label}`;
