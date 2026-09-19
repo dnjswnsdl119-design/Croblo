@@ -20,7 +20,7 @@
   #canvas{display:block;width:100%;height:100%;cursor:crosshair;}
   #game-container{position:relative;width:100%;height:100%;}
 
-  .panel{background:var(--panel-bg);border:2px solid var(--panel-border);border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,0.6);}
+  .panel{background:var(--panel-bg);border:2px solid var(--panel-border);border-radius:8px;box-shadow:0 4px 18px rgba(0,0,0,0.6);z-index:20;}
 
   /* ---------- HUD ---------- */
   #hud{position:absolute;top:14px;left:14px;width:300px;padding:10px 14px;color:#eee;pointer-events:none;}
@@ -226,7 +226,7 @@
   .stat-row-btn:disabled{opacity:0.25;cursor:not-allowed;}
 
   /* ---------- 스킬트리 패널 ---------- */
-  #skilltree-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;max-width:92vw;max-height:82vh;overflow-y:auto;padding:16px;color:#eee;}
+  #skilltree-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:520px;max-width:94vw;max-height:82vh;overflow-y:auto;padding:16px;color:#eee;}
   #skilltree-panel.hidden{display:none;}
   #skilltree-points-line{font-size:12px;color:#aad4ff;margin-bottom:10px;}
   #skilltree-points-count{color:var(--gold);font-weight:bold;}
@@ -241,9 +241,19 @@
   .skill-row-req.unmet{color:#ff8a8a;}
   .skill-row-btn{width:100%;padding:7px;border-radius:5px;border:1px solid var(--gold);background:rgba(232,198,106,0.12);color:var(--gold);cursor:pointer;font-size:12px;}
   .skill-row-btn:disabled{opacity:0.3;cursor:not-allowed;border-color:#555;color:#888;}
-  .skilltree-branch-row{display:flex;gap:8px;}
-  .skilltree-branch-row .skill-row.branch-item{flex:1;min-width:0;}
+  /* 트리 연결선: 단일 노드 티어는 위 티어에서 곧게 내려오는 줄기, 분기 티어는 가로선에서 각 노드로 갈라지는 가지 */
+  #skilltree-rows{position:relative;}
+  #skilltree-rows .combine-section-title{position:relative;}
+  #skilltree-rows .combine-section-title:not(:first-child)::after{content:'';position:absolute;top:-6px;left:50%;width:2px;height:6px;background:#665;}
+  .skilltree-branch-row{display:flex;gap:6px;position:relative;padding-top:14px;}
+  .skilltree-branch-row::before{content:'';position:absolute;top:0;left:16.5%;right:16.5%;height:2px;background:#665;}
+  .skilltree-branch-row .skill-row.branch-item{flex:1;min-width:0;position:relative;}
+  .skilltree-branch-row .skill-row.branch-item::before{content:'';position:absolute;top:-14px;left:50%;width:2px;height:14px;background:#665;}
   .skill-row.branch-item{border-left:2px solid #ff8ccf;}
+  .skill-row.branch-item .skill-row-name{font-size:11.5px;}
+  .skill-row.branch-item .skill-row-desc{font-size:9.5px;}
+  .skill-row.branch-item .skill-row-req{font-size:9px;}
+  .skill-row.branch-item .skill-row-btn{font-size:10.5px;padding:6px 2px;}
   #stat-points-badge, #skill-points-badge{display:inline-block;min-width:16px;height:16px;padding:0 3px;margin-left:4px;background:#e33;color:#fff;border-radius:8px;font-size:10px;line-height:16px;text-align:center;vertical-align:middle;}
   #stat-points-badge.hidden, #skill-points-badge.hidden{display:none;}
 
@@ -1250,7 +1260,7 @@ const player = {
   allocatedStats:{ str:0, agi:0, int:0, vit:0 },
   junkThreshold:'magic',
   skillPoints:0,
-  skillRanks:{ s1:0, s2:0, s2b:0, s3:0, s5:0, s5b:0 },
+  skillRanks:{ s1:0, s2:0, s2b:0, s2c:0, s2x:0, s2bx:0, s2cx:0, s3:0, s5:0, s5b:0, s5c:0 },
   currentTown:'town1',
 };
 const JUNK_RARITY_OPTIONS = ['normal','magic','rare','set'];
@@ -1291,9 +1301,14 @@ const CLASS_DEFS = {
       s1:{ name:'크리티컬 블로', icon:'⚔️', type:'melee_single', mult:2.6, cdMax:4, cost:15, desc:'적 하나에게 강력한 일격을 가한다.' },
       s2:{ name:'휩쓸기',       icon:'🌀', type:'melee_aoe',    mult:1.25, radius:3.6, cdMax:6, cost:20, desc:'주변의 적들을 검으로 휩쓴다. (공격 루트)', prereq:{skill:'s1',rank:2} },
       s2b:{ name:'수호의 외침', icon:'🔰', type:'buff_def',     bonus:0.35, duration:6, cdMax:11, cost:18, desc:'방패로 땅을 내리쳐 방어력을 높인다. (수호 루트)', prereq:{skill:'s1',rank:2} },
+      s2c:{ name:'전장의 포효', icon:'📯', type:'buff_atk_heal', atkBonus:0.22, healPct:0.15, duration:6, cdMax:13, cost:22, desc:'포효하여 공격력을 높이고 체력을 회복한다. (숙련 루트)', prereq:{skill:'s1',rank:2} },
+      s2x:{ name:'예리한 감각', icon:'🎯', type:'passive_stat', passiveBonus:{crit:2.5}, desc:'치명타 확률이 영구적으로 증가한다. (공격 루트 패시브)', prereq:{skill:'s2',rank:1} },
+      s2bx:{ name:'강인한 육체', icon:'💪', type:'passive_stat', passiveBonus:{def:6,hp:15}, desc:'방어력과 체력이 영구적으로 증가한다. (수호 루트 패시브)', prereq:{skill:'s2b',rank:1} },
+      s2cx:{ name:'신속한 몸놀림', icon:'💨', type:'passive_stat', passiveBonus:{atkSpeed:0.04}, desc:'공격 속도가 영구적으로 증가한다. (숙련 루트 패시브)', prereq:{skill:'s2c',rank:1} },
       s3:{ name:'브레이브',      icon:'🛡️', type:'buff_def',    bonus:0.4, duration:6, cdMax:14, cost:20, desc:'일정 시간 동안 방어력이 크게 증가한다.', prereq:{skill:'s1',rank:1} },
       s5:{ name:'결전의 일격',  icon:'💥', type:'melee_single', mult:4.5, cdMax:12, cost:35, desc:'적 하나에게 막대한 피해를 입히는 필살기. (공격 루트 궁극기)', prereq:{skill:'s2',rank:1} },
       s5b:{ name:'불굴의 의지', icon:'🛡️', type:'buff_def', bonus:1.1, duration:8, cdMax:20, cost:40, desc:'일정 시간 동안 방어력이 극적으로 증가하는 궁극의 수호 태세. (수호 루트 궁극기)', prereq:{skill:'s2b',rank:1} },
+      s5c:{ name:'불멸의 포효', icon:'📯', type:'buff_atk_heal', atkBonus:0.5, healPct:0.35, duration:8, cdMax:20, cost:38, desc:'강력한 포효로 공격력이 크게 오르고 체력을 대폭 회복하는 궁극기. (숙련 루트 궁극기)', prereq:{skill:'s2c',rank:1} },
     },
     skill4:{ name:'검기 파동', icon:'🌊', color:0x5ab0ff, ringColor:0x8ad8ff, dmgColor:'#8ad8ff',
       cdMax:9, cost:28, speed:5.0, radius:1.8, tickInterval:0.35, dmgMult:0.9, lifeDistance:18,
@@ -1309,9 +1324,14 @@ const CLASS_DEFS = {
       s1:{ name:'분쇄의 일격',   icon:'⚔️', type:'melee_single', mult:2.2, cdMax:4, cost:15, desc:'거대한 무기로 적을 내려찍는다.' },
       s2:{ name:'광란의 베기',  icon:'🌀', type:'melee_aoe',    mult:1.3, radius:3.8, cdMax:7, cost:20, desc:'무기를 크게 휘둘러 주변 적을 베어낸다. (공격 루트)', prereq:{skill:'s1',rank:2} },
       s2b:{ name:'스톤스킨',    icon:'🪨', type:'buff_def',     bonus:0.55, duration:6, cdMax:12, cost:20, desc:'피부가 돌처럼 단단해져 방어력이 크게 증가한다. (수호 루트)', prereq:{skill:'s1',rank:2} },
+      s2c:{ name:'광포화',      icon:'🌪️', type:'buff_speed',  mult:1.3, duration:5, cdMax:10, cost:18, desc:'광기에 휩싸여 이동 속도가 빨라진다. (숙련 루트)', prereq:{skill:'s1',rank:2} },
+      s2x:{ name:'예리한 감각', icon:'🎯', type:'passive_stat', passiveBonus:{crit:2.5}, desc:'치명타 확률이 영구적으로 증가한다. (공격 루트 패시브)', prereq:{skill:'s2',rank:1} },
+      s2bx:{ name:'강인한 육체', icon:'💪', type:'passive_stat', passiveBonus:{def:6,hp:15}, desc:'방어력과 체력이 영구적으로 증가한다. (수호 루트 패시브)', prereq:{skill:'s2b',rank:1} },
+      s2cx:{ name:'신속한 몸놀림', icon:'💨', type:'passive_stat', passiveBonus:{atkSpeed:0.04}, desc:'공격 속도가 영구적으로 증가한다. (숙련 루트 패시브)', prereq:{skill:'s2c',rank:1} },
       s3:{ name:'라이온하트',   icon:'📣', type:'buff_atk_heal', atkBonus:0.28, healPct:0.2, duration:6, cdMax:16, cost:25, desc:'포효하여 공격력을 높이고 체력을 회복한다.', prereq:{skill:'s1',rank:1} },
       s5:{ name:'광란의 강타',  icon:'💥', type:'melee_aoe', mult:2.2, radius:4.2, cdMax:14, cost:40, desc:'주변 모든 적을 강타하는 광란의 일격. (공격 루트 궁극기)', prereq:{skill:'s2',rank:1} },
       s5b:{ name:'피의 갈증',  icon:'🩸', type:'buff_atk_heal', atkBonus:0.6, healPct:0.45, duration:8, cdMax:20, cost:40, desc:'적의 피를 갈망하며 공격력이 크게 오르고 체력을 대폭 회복한다. (수호 루트 궁극기)', prereq:{skill:'s2b',rank:1} },
+      s5c:{ name:'피의 폭주',  icon:'🌪️', type:'buff_speed', mult:2.1, duration:8, cdMax:18, cost:38, desc:'광기의 폭주로 이동 속도가 극적으로 빨라지는 궁극기. (숙련 루트 궁극기)', prereq:{skill:'s2c',rank:1} },
     },
     skill4:{ name:'포효의 파동', icon:'🔥', color:0xff6a3a, ringColor:0xffab6a, dmgColor:'#ff8a4a',
       cdMax:10, cost:32, speed:3.8, radius:2.1, tickInterval:0.4, dmgMult:1.0, lifeDistance:16,
@@ -1327,9 +1347,14 @@ const CLASS_DEFS = {
       s1:{ name:'데들리 어썰트', icon:'⚔️', type:'melee_single', mult:3.1, cdMax:5, cost:18, desc:'번개같은 찌르기로 치명적인 피해를 입힌다.' },
       s2:{ name:'크러싱 폴',    icon:'🌀', type:'melee_aoe',    mult:1.3, radius:3.6, cdMax:6, cost:20, desc:'창을 내리찍어 주변 적들에게 피해를 입힌다. (공격 루트)', prereq:{skill:'s1',rank:2} },
       s2b:{ name:'회피의 춤',   icon:'💨', type:'buff_speed',   mult:1.3, duration:5, cdMax:10, cost:16, desc:'유려한 몸놀림으로 이동 속도가 빨라진다. (기동 루트)', prereq:{skill:'s1',rank:2} },
+      s2c:{ name:'창의 수호',   icon:'🔰', type:'buff_def',     bonus:0.32, duration:6, cdMax:11, cost:18, desc:'창으로 몸을 지켜 방어력이 오른다. (숙련 루트)', prereq:{skill:'s1',rank:2} },
+      s2x:{ name:'예리한 감각', icon:'🎯', type:'passive_stat', passiveBonus:{crit:2.5}, desc:'치명타 확률이 영구적으로 증가한다. (공격 루트 패시브)', prereq:{skill:'s2',rank:1} },
+      s2bx:{ name:'가벼운 발놀림', icon:'💨', type:'passive_stat', passiveBonus:{atkSpeed:0.04}, desc:'공격 속도가 영구적으로 증가한다. (기동 루트 패시브)', prereq:{skill:'s2b',rank:1} },
+      s2cx:{ name:'강인한 육체', icon:'💪', type:'passive_stat', passiveBonus:{def:6,hp:15}, desc:'방어력과 체력이 영구적으로 증가한다. (숙련 루트 패시브)', prereq:{skill:'s2c',rank:1} },
       s3:{ name:'헤이스트',     icon:'💨', type:'buff_speed',   mult:1.45, duration:5, cdMax:12, cost:20, desc:'이동 속도가 크게 빨라진다.', prereq:{skill:'s1',rank:1} },
       s5:{ name:'천공섬',       icon:'💥', type:'melee_single', mult:5.0, cdMax:10, cost:32, desc:'하늘을 가르는 필살의 일격. 극도로 높은 단일 대상 피해. (공격 루트 궁극기)', prereq:{skill:'s2',rank:1} },
       s5b:{ name:'질풍노도',   icon:'🌪️', type:'buff_speed', mult:2.0, duration:8, cdMax:18, cost:36, desc:'폭풍처럼 몰아치며 이동 속도가 극적으로 빨라진다. (기동 루트 궁극기)', prereq:{skill:'s2b',rank:1} },
+      s5c:{ name:'불굴의 창술', icon:'🔰', type:'buff_def', bonus:1.0, duration:8, cdMax:20, cost:38, desc:'창술의 극의로 방어력이 극적으로 오르는 궁극기. (숙련 루트 궁극기)', prereq:{skill:'s2c',rank:1} },
     },
     skill4:{ name:'질풍의 창격', icon:'✨', color:0xffe066, ringColor:0xfff3b0, dmgColor:'#ffe066',
       cdMax:8, cost:26, speed:6.0, radius:1.6, tickInterval:0.3, dmgMult:0.8, lifeDistance:20,
@@ -1345,9 +1370,14 @@ const CLASS_DEFS = {
       s1:{ name:'매직 미사일',   icon:'⚔️', type:'ranged_single', mult:2.3, cdMax:2.6, cost:12, desc:'마력탄을 발사해 원거리 피해를 입힌다.' },
       s2:{ name:'아스트랄 스톰', icon:'🌀', type:'ranged_aoe',    mult:1.4, radius:3.6, cdMax:7, cost:22, desc:'원소의 폭풍을 일으켜 넓은 범위에 피해를 입힌다. (공격 루트)', prereq:{skill:'s1',rank:2} },
       s2b:{ name:'가속 시전',   icon:'🌪️', type:'buff_speed',   mult:1.25, duration:5, cdMax:10, cost:18, desc:'마력으로 몸을 가볍게 하여 이동 속도를 높인다. (원소 제어 루트)', prereq:{skill:'s1',rank:2} },
+      s2c:{ name:'정신 집중',   icon:'📯', type:'buff_atk_heal', atkBonus:0.2, healPct:0.12, duration:6, cdMax:13, cost:20, desc:'정신을 집중해 공격력을 높이고 생명력을 회복한다. (숙련 루트)', prereq:{skill:'s1',rank:2} },
+      s2x:{ name:'예리한 감각', icon:'🎯', type:'passive_stat', passiveBonus:{crit:2.5}, desc:'치명타 확률이 영구적으로 증가한다. (공격 루트 패시브)', prereq:{skill:'s2',rank:1} },
+      s2bx:{ name:'신속한 몸놀림', icon:'💨', type:'passive_stat', passiveBonus:{atkSpeed:0.04}, desc:'공격 속도가 영구적으로 증가한다. (원소 제어 루트 패시브)', prereq:{skill:'s2b',rank:1} },
+      s2cx:{ name:'강인한 정신력', icon:'💪', type:'passive_stat', passiveBonus:{def:6,hp:15}, desc:'방어력과 체력이 영구적으로 증가한다. (숙련 루트 패시브)', prereq:{skill:'s2c',rank:1} },
       s3:{ name:'매직실드',     icon:'🔰', type:'buff_shield',   reduction:0.4, duration:5, cdMax:14, cost:20, desc:'마법 보호막을 둘러 받는 피해를 줄인다.', prereq:{skill:'s1',rank:1} },
       s5:{ name:'메테오 스트라이크', icon:'💥', type:'ranged_aoe', mult:2.6, radius:4.5, cdMax:13, cost:45, desc:'하늘에서 유성을 떨어뜨려 넓은 범위에 큰 피해를 입힌다. (공격 루트 궁극기)', prereq:{skill:'s2',rank:1} },
       s5b:{ name:'빙결의 지배자', icon:'❄️', type:'buff_shield', reduction:0.75, duration:8, cdMax:20, cost:42, desc:'얼음 보호막을 둘러 받는 피해를 극적으로 줄이는 궁극의 방어 마법. (원소 제어 루트 궁극기)', prereq:{skill:'s2b',rank:1} },
+      s5c:{ name:'대현자의 각성', icon:'📯', type:'buff_atk_heal', atkBonus:0.55, healPct:0.3, duration:8, cdMax:20, cost:40, desc:'현자의 각성으로 공격력이 크게 오르고 생명력을 대폭 회복하는 궁극기. (숙련 루트 궁극기)', prereq:{skill:'s2c',rank:1} },
     },
     skill4:{ name:'악령 소환', icon:'👻', color:0x6a2a9a, ringColor:0xaa66ff, dmgColor:'#aa66ff',
       cdMax:9, cost:30, speed:4.5, radius:1.8, tickInterval:0.35, dmgMult:0.85, lifeDistance:18,
@@ -1358,8 +1388,8 @@ function getClassDef(){ return player.classId ? CLASS_DEFS[player.classId] : nul
 
 // 희귀 아이템 전용 부가 옵션: 착용 시 특정 슬롯(①~③단계)의 스킬 랭크를 추가로 올려준다.
 // 스킬을 아예 배우지 않았다면 효과가 없으며, 이미 배운 스킬의 위력/재사용시간/소모마력만 강화한다.
-const SKILL_BONUS_POOL = ['s1','s2','s2b','s3'];
-const SKILL_BONUS_LABEL = { s1:'① 기본기', s2:'② 전투 스타일(공격 루트)', s2b:'② 전투 스타일(수호·기동 루트)', s3:'③ 지원기' };
+const SKILL_BONUS_POOL = ['s1','s2','s2b','s2c','s3'];
+const SKILL_BONUS_LABEL = { s1:'① 기본기', s2:'② 전투 스타일(공격 루트)', s2b:'② 전투 스타일(수호 루트)', s2c:'② 전투 스타일(숙련 루트)', s3:'④ 지원기' };
 function getEquipSkillBonus(key){
   let bonus = 0;
   EQUIP_SLOTS.forEach(slot=>{
@@ -1379,13 +1409,19 @@ const SKILL_TREE_REQS = {
   s1: [ {level:1, rebirth:0}, {level:5, rebirth:0}, {level:12, rebirth:1} ],
   s2: [ {level:5, rebirth:0}, {level:10, rebirth:0}, {level:16, rebirth:1} ],
   s2b: [ {level:5, rebirth:0}, {level:10, rebirth:0}, {level:16, rebirth:1} ],
+  s2c: [ {level:5, rebirth:0}, {level:10, rebirth:0}, {level:16, rebirth:1} ],
+  s2x: [ {level:8, rebirth:0}, {level:13, rebirth:0}, {level:18, rebirth:1} ],
+  s2bx: [ {level:8, rebirth:0}, {level:13, rebirth:0}, {level:18, rebirth:1} ],
+  s2cx: [ {level:8, rebirth:0}, {level:13, rebirth:0}, {level:18, rebirth:1} ],
   s3: [ {level:10, rebirth:0}, {level:14, rebirth:1}, {level:20, rebirth:2} ],
   s5: [ {level:15, rebirth:1} ],
   s5b: [ {level:15, rebirth:1} ],
+  s5c: [ {level:15, rebirth:1} ],
 };
-// 서로 배타적인 분기 묶음: 한쪽을 배우면 다른 쪽은 초기화 전까지 배울 수 없다 (플레이어별 스킬 루트 분기)
-// s2/s2b = 2단계 전투 스타일 분기(공격 vs 수호·기동), s5/s5b = 4단계 궁극기 분기(각각 s2/s2b 계열을 선행해야 함)
-const EXCLUSIVE_SKILL_GROUPS = [ ['s2','s2b'], ['s5','s5b'] ];
+// 서로 배타적인 분기 묶음: 하나를 배우면 나머지는 초기화 전까지 배울 수 없다 (플레이어별 스킬 루트 분기)
+// s2/s2b/s2c = 2단계 전투 스타일 3분기(공격/수호/숙련), s5/s5b/s5c = 궁극기 3분기(각각 대응하는 2단계 루트를 선행해야 함)
+// s2x/s2bx/s2cx(루트 심화 패시브)는 각자의 prereq가 해당 루트의 2단계 스킬을 요구하므로 별도 배타 그룹 없이도 자연히 하나만 배울 수 있다
+const EXCLUSIVE_SKILL_GROUPS = [ ['s2','s2b','s2c'], ['s5','s5b','s5c'] ];
 function getExclusiveGroupOf(key){
   return EXCLUSIVE_SKILL_GROUPS.find(g=>g.includes(key));
 }
@@ -1398,12 +1434,31 @@ const STONE_COST_GUARANTEE = 3;
 const MAX_POTIONS = 9;
 const POTION_HEAL_PCT = 0.35;
 
+// 스킬트리 ③단계 "루트 심화" 패시브(s2x/s2bx/s2cx)의 영구 스탯 보너스를 적용한다.
+// 선택하지 않은 루트의 패시브는 prereq 미충족으로 랭크가 0이라 자동으로 무시된다.
+function applyTreePassiveStats(stats){
+  const cls = getClassDef();
+  if(!cls) return;
+  ['s2x','s2bx','s2cx'].forEach(key=>{
+    const rank = player.skillRanks[key] || 0;
+    if(rank <= 0) return;
+    const skill = cls.skills[key];
+    const b = skill && skill.passiveBonus;
+    if(!b) return;
+    if(b.crit) stats.crit += b.crit*rank;
+    if(b.def) stats.def += b.def*rank;
+    if(b.hp) stats.hp += b.hp*rank;
+    if(b.atkSpeed) stats._atkSpeedBonus = (stats._atkSpeedBonus||0) + b.atkSpeed*rank;
+  });
+}
+
 function getTotalStats(){
   const stats = { hp:player.baseHp, atk:player.baseAtk, def:player.baseDef, crit:player.baseCrit };
   const alloc = player.allocatedStats;
   stats.atk += (alloc.str||0)*1;
   stats.crit += (alloc.agi||0)*0.3;
   stats.hp += (alloc.vit||0)*4;
+  applyTreePassiveStats(stats); // 스킬트리 루트 심화 패시브(s2x/s2bx/s2cx) 보너스
   for(const slot in player.equipment){
     const item = player.equipment[slot];
     if(!item) continue;
@@ -1840,10 +1895,13 @@ function applyGrowthLifesteal(dmg){
   player.hp = Math.min(getTotalStats().hp, player.hp + heal);
   refreshHUD();
 }
-// 성장무기 "폭풍의 각인" 경로: 기본공격/스킬 재사용시간을 단축
+// 기본공격/스킬 재사용시간 배율: 성장무기 "폭풍의 각인" 경로 + 스킬트리 "숙련" 루트 패시브(s2cx 등)를 함께 반영
 function getGrowthAtkSpeedMult(){
   const w = player.equipment.weapon;
-  return (w && w.isGrowthWeapon && w.growthPath === 'storm') ? GROWTH_PATHS.storm.atkSpeedMult : 1;
+  let mult = (w && w.isGrowthWeapon && w.growthPath === 'storm') ? GROWTH_PATHS.storm.atkSpeedMult : 1;
+  const passiveBonus = getTotalStats()._atkSpeedBonus || 0;
+  mult *= (1 - passiveBonus);
+  return mult;
 }
 
 function toggleMount(){
@@ -1926,22 +1984,26 @@ const skillState = {
   s1: { cd:0 },
   s2: { cd:0 },
   s2b: { cd:0 },
+  s2c: { cd:0 },
   s3: { cd:0 },
   s4: { cd:0 },
   s5: { cd:0 },
   s5b: { cd:0 },
+  s5c: { cd:0 },
 };
 
-// 슬롯2는 s2/s2b 중 플레이어가 선택(습득)한 2단계 전투 스타일을 표시한다
+// 슬롯2는 s2/s2b/s2c 중 플레이어가 선택(습득)한 2단계 전투 스타일을 표시한다
 function getActiveSlot2Key(){
   if(player.skillRanks.s2 > 0) return 's2';
   if(player.skillRanks.s2b > 0) return 's2b';
+  if(player.skillRanks.s2c > 0) return 's2c';
   return 's2';
 }
-// 슬롯5는 s5/s5b 중 플레이어가 선택(습득)한 궁극기를 표시한다
+// 슬롯5는 s5/s5b/s5c 중 플레이어가 선택(습득)한 궁극기를 표시한다
 function getActiveUltimateKey(){
   if(player.skillRanks.s5 > 0) return 's5';
   if(player.skillRanks.s5b > 0) return 's5b';
+  if(player.skillRanks.s5c > 0) return 's5c';
   return 's5';
 }
 function findNearestMonster(maxDist){
@@ -3932,14 +3994,18 @@ document.getElementById('btn-statpanel').addEventListener('click', toggleStatPan
 /* ---------------------------- 스킬트리 ---------------------------- */
 
 const skilltreePanel = document.getElementById('skilltree-panel');
-// 스킬트리 구조: 4단계 트리. ②③단계는 서로 다른 루트로 갈라져 클래스마다 다른 스킬 구성이 가능하다.
-//   ① 기본기(s1) -> ② 전투 스타일 분기(s2 공격 vs s2b 수호·기동, 택1) -> ③ 지원기(s3, 루트 무관 자유 습득)
-//                -> ④ 궁극기(s5는 s2 선행 필요, s5b는 s2b 선행 필요, 택1)
+// 스킬트리 구조: 5단계 트리, ②단계에서 3갈래로 나뉘어 클래스마다 훨씬 다양한 빌드를 고민할 수 있다.
+//   ① 기본기(s1)
+//   -> ② 전투 스타일 3분기(s2 공격 / s2b 수호 / s2c 숙련, 택1)
+//   -> ③ 루트 심화 패시브(s2x/s2bx/s2cx, 선택한 루트만 성장 가능 · 영구 스탯 보너스)
+//   -> ④ 지원기(s3, 루트 무관 자유 습득)
+//   -> ⑤ 궁극기 3분기(s5/s5b/s5c, 각각 대응하는 ②단계 루트를 선행해야 함, 택1)
 const SKILL_TREE_TIERS = [
   { title:'① 기본기', keys:['s1'] },
-  { title:'② 전투 스타일 분기 (택1 · 반대 루트는 초기화 전까지 잠김)', keys:['s2','s2b'], branch:true },
-  { title:'③ 지원기 (루트 무관 · 기본기만 있으면 습득 가능)', keys:['s3'] },
-  { title:'④ 궁극기 선택 (택1 · ②단계에서 고른 루트의 궁극기만 배울 수 있음)', keys:['s5','s5b'], branch:true },
+  { title:'② 전투 스타일 분기 (택1 · 3가지 루트 중 선택 · 다른 루트는 초기화 전까지 잠김)', keys:['s2','s2b','s2c'], branch:true },
+  { title:'③ 루트 심화 패시브 (선택한 전투 스타일만 성장 가능 · 영구 스탯 보너스)', keys:['s2x','s2bx','s2cx'], branch:true },
+  { title:'④ 지원기 (루트 무관 · 기본기만 있으면 습득 가능)', keys:['s3'] },
+  { title:'⑤ 궁극기 선택 (택1 · ②단계에서 고른 루트의 궁극기만 배울 수 있음)', keys:['s5','s5b','s5c'], branch:true },
 ];
 const SKILL_TREE_ORDER = SKILL_TREE_TIERS.flatMap(t=>t.keys);
 
@@ -4987,10 +5053,12 @@ function updatePlayer(dt){
   if(skillState.s1.cd > 0) skillState.s1.cd -= dt;
   if(skillState.s2.cd > 0) skillState.s2.cd -= dt;
   if(skillState.s2b.cd > 0) skillState.s2b.cd -= dt;
+  if(skillState.s2c.cd > 0) skillState.s2c.cd -= dt;
   if(skillState.s3.cd > 0) skillState.s3.cd -= dt;
   if(skillState.s4.cd > 0) skillState.s4.cd -= dt;
   if(skillState.s5.cd > 0) skillState.s5.cd -= dt;
   if(skillState.s5b.cd > 0) skillState.s5b.cd -= dt;
+  if(skillState.s5c.cd > 0) skillState.s5c.cd -= dt;
   if(basicAttackState.cd > 0) basicAttackState.cd -= dt;
   ['atk','def','dmgReduction','speed'].forEach(k=>{
     if(player.buffTimers[k] > 0){
@@ -5375,7 +5443,7 @@ function selectClass(classId){
   player.baseDef = cls.base.def; player.baseCrit = cls.base.crit;
   player.hp = cls.base.hp;
   player.baseMp = cls.base.mp; player.mp = cls.base.mp;
-  player.skillRanks = { s1:1, s2:0, s2b:0, s3:0, s5:0, s5b:0 };
+  player.skillRanks = { s1:1, s2:0, s2b:0, s2c:0, s2x:0, s2bx:0, s2cx:0, s3:0, s5:0, s5b:0, s5c:0 };
   player.skillPoints = 0;
   applyClassVisual();
   applySkillUI();
@@ -5470,8 +5538,8 @@ function loadGame(){
     // 스킬트리 도입 이전 세이브는 s1/s2/s3를 이미 쓰던 것으로 간주해 랭크1로 승계, 신규 필살기(s5)만 새로 습득해야 함
     player.skillPoints = data.skillPoints || 0;
     player.skillRanks = data.skillRanks
-      ? Object.assign({ s1:0, s2:0, s2b:0, s3:0, s5:0, s5b:0 }, data.skillRanks)
-      : { s1:1, s2:1, s2b:0, s3:1, s5:0, s5b:0 };
+      ? Object.assign({ s1:0, s2:0, s2b:0, s2c:0, s2x:0, s2bx:0, s2cx:0, s3:0, s5:0, s5b:0, s5c:0 }, data.skillRanks)
+      : { s1:1, s2:1, s2b:0, s2c:0, s2x:0, s2bx:0, s2cx:0, s3:1, s5:0, s5b:0, s5c:0 };
     player.currentTown = TOWNS[data.currentTown] ? data.currentTown : 'town1';
     player.hp = player.baseHp;
     player.mp = player.baseMp;
