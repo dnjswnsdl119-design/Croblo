@@ -73,6 +73,8 @@
   #inv-header h2 .inv-count{color:#999;font-size:12px;font-weight:normal;margin-left:6px;}
   #btn-sell-junk{padding:6px 10px;border-radius:5px;border:1px solid var(--panel-border);background:#221d15;color:var(--gold);cursor:pointer;font-size:11px;white-space:nowrap;}
   #btn-sell-junk:hover{background:#332b1e;}
+  #btn-identify-all{padding:6px 10px;border-radius:5px;border:1px solid #4dd9ff;background:#182228;color:#4dd9ff;cursor:pointer;font-size:11px;white-space:nowrap;}
+  #btn-identify-all:hover{background:#1f2f38;}
   #junk-threshold-select{padding:6px 6px;border-radius:5px;border:1px solid var(--panel-border);background:#1a1712;color:#ccc;font-size:11px;cursor:pointer;}
   #inv-close{cursor:pointer;color:#aaa;font-size:18px;background:none;border:none;}
   #inv-body{display:flex;gap:18px;min-height:0;flex:1;}
@@ -126,6 +128,9 @@
   #detail-actions button{flex:1;padding:8px;border-radius:5px;border:1px solid var(--panel-border);background:#221d15;color:#eee;cursor:pointer;font-size:12px;}
   #detail-actions button:hover{background:#332b1e;}
   #detail-actions button:disabled{opacity:0.4;cursor:not-allowed;}
+  #btn-identify{border-color:#4dd9ff;color:#4dd9ff;}
+  #btn-identify:hover{background:rgba(77,217,255,0.12);}
+  .unident-badge{position:absolute;top:1px;left:2px;font-size:11px;}
   #enhance-info{font-size:11px;color:#aaa;margin-top:6px;}
   #enhance-result{font-size:12px;font-weight:bold;margin-top:6px;height:16px;}
 
@@ -530,6 +535,7 @@
     <div id="inv-header">
       <h2>인벤토리 & 장비</h2>
       <select id="junk-threshold-select" title="잡템 기준 등급 선택"></select>
+      <button id="btn-identify-all">🔍 전체 감정</button>
       <button id="btn-sell-junk">🪙 잡템 정리</button>
       <button id="inv-close">✕</button>
     </div>
@@ -556,6 +562,7 @@
             <div id="detail-set-info"></div>
             <div id="socket-info"></div>
             <div id="detail-actions">
+              <button id="btn-identify" style="display:none;">🔍 감정하기</button>
               <button id="btn-equip">장착</button>
               <button id="btn-unequip" style="display:none;">해제</button>
               <button id="btn-disassemble">🔨 분해</button>
@@ -917,7 +924,7 @@ function createRandomItem(monsterLevel){
       name: piece.name,
       slot, rarity:'set', setId: setDef.id, setName: setDef.name,
       base: {...piece.base}, enhance:0,
-      sockets: SOCKET_COUNT_BY_RARITY.set, runes:[],
+      sockets: SOCKET_COUNT_BY_RARITY.set, runes:[], identified:false,
     };
   }
   if(rarityKey === 'unique'){
@@ -925,7 +932,7 @@ function createRandomItem(monsterLevel){
     return {
       uid: itemUid++, name:u.name, slot:u.slot, rarity:'unique',
       base:{...u.base}, flavor:u.flavor, enhance:0,
-      sockets: SOCKET_COUNT_BY_RARITY.unique, runes:[],
+      sockets: SOCKET_COUNT_BY_RARITY.unique, runes:[], identified:false,
     };
   }
 
@@ -960,7 +967,12 @@ function createRandomItem(monsterLevel){
   }
 
   return { uid:itemUid++, name, slot, rarity:rarityKey, base, enhance:0,
-    sockets: SOCKET_COUNT_BY_RARITY[rarityKey]||0, runes:[], skillBonus };
+    sockets: SOCKET_COUNT_BY_RARITY[rarityKey]||0, runes:[], skillBonus,
+    identified: rarityKey !== 'rare' };
+}
+// 미감정 아이템 감정 비용 (등급이 높을수록 비쌈)
+function identifyCost(item){
+  return { rare:60, set:150, unique:260 }[item.rarity] || 40;
 }
 
 // 디아블로 스타일 룬: 장비의 소켓에 삽입해 고정 스탯 보너스를 얻는다
@@ -1195,7 +1207,7 @@ function computeItemPower(item){
 
 // 파밍한 아이템이 현재 장착 중인 같은 부위 장비보다 강한지 (즉시 장착 추천 여부)
 function isUpgrade(item){
-  if(!item || SOCKETABLE_SLOTS.includes(item.slot)) return false;
+  if(!item || SOCKETABLE_SLOTS.includes(item.slot) || item.identified === false) return false;
   const equipped = player.equipment[item.slot];
   if(!equipped) return true;
   return computeItemPower(item) > computeItemPower(equipped);
@@ -1449,6 +1461,13 @@ function getTotalStats(){
   return stats;
 }
 
+// 전투력: 스탯+장비+레벨을 하나의 숫자로 요약한 지표. 지역 입장은 이 숫자로 막지 않고 "권장치"로만 안내한다 -
+// 레벨은 낮아도 장비/빌드가 좋으면 권장 전투력을 넘길 수 있고, 그 반대도 가능하다.
+function computePlayerPower(){
+  const s = getTotalStats();
+  return Math.round(s.atk*4 + s.def*4 + s.hp*0.5 + s.crit*6 + player.level*8);
+}
+
 function addXP(amount){
   player.xp += amount;
   while(player.xp >= player.xpToNext){
@@ -1503,7 +1522,7 @@ function addItemToInventory(item){
   if(isUpgrade(item)){
     spawnToast(`⬆ 업그레이드! ${item.name} (인벤토리에서 즉시 장착 가능)`, '#5cff8a');
   } else {
-    spawnToast(`획득: ${item.name}`, rc);
+    spawnToast(`획득: ${item.identified===false ? '미감정 '+SLOT_LABEL[item.slot] : item.name}`, rc);
   }
   SFX.pickup();
   return true;
@@ -2396,12 +2415,12 @@ function spawnLoot(item, x, z){
   nameLabel.className = 'loot-label';
   nameLabel.style.color = rarityDef.color;
   nameLabel.style.textShadow = tier >= 3 ? `0 0 6px ${rarityDef.color}, 0 1px 3px #000` : '0 1px 3px #000';
-  nameLabel.textContent = item.name;
+  nameLabel.textContent = item.identified === false ? `❓ 미감정 ${SLOT_LABEL[item.slot]}` : item.name;
   document.getElementById('game-container').appendChild(nameLabel);
 
   if(tier >= 3){
     spawnRarityBurst(x, z, rarityDef.color);
-    spawnToast(`✨ ${rarityDef.label} 아이템 발견: ${item.name}`, rarityDef.color);
+    spawnToast(`✨ ${rarityDef.label} 아이템 발견: ${item.identified===false ? '미감정 '+SLOT_LABEL[item.slot] : item.name}`, rarityDef.color);
     SFX.enhanceSuccess();
   }
 
@@ -3342,10 +3361,10 @@ function updatePortals4(dt){
 
 // 던전별 최소/권장 레벨 (마을·던전 난이도 곡선을 명시적으로 강제)
 const DUNGEON_LEVEL_REQS = {
-  dungeon1: { minLevel:1,  recLevel:8,  name:'오크 소굴' },
-  dungeon2: { minLevel:12, recLevel:16, name:'심연의 균열' },
-  dungeon3: { minLevel:18, recLevel:22, name:'침몰한 유적' },
-  dungeon4: { minLevel:24, recLevel:28, name:'모래 무덤' },
+  dungeon1: { minLevel:1,  recLevel:8,  recPower:450,  name:'오크 소굴' },
+  dungeon2: { minLevel:12, recLevel:16, recPower:800,  name:'심연의 균열' },
+  dungeon3: { minLevel:18, recLevel:22, recPower:1050, name:'침몰한 유적' },
+  dungeon4: { minLevel:24, recLevel:28, recPower:1300, name:'모래 무덤' },
 };
 const levelGateWarnCooldowns = {};
 function checkDungeonLevelGate(key){
@@ -3362,13 +3381,18 @@ function checkDungeonLevelGate(key){
     spawnToast(`⚠ 권장 레벨 Lv.${req.recLevel} 미만입니다. 주의하세요`, '#ffd84a');
     levelGateWarnCooldowns[key+'_rec'] = now + 12000;
   }
+  const myPower = computePlayerPower();
+  if(req.recPower && myPower < req.recPower && !(levelGateWarnCooldowns[key+'_pow'] > now)){
+    spawnToast(`⚠ 추천 전투력 ${req.recPower} 미만입니다 (내 전투력 ${myPower}). 실력이나 빌드에 자신 있다면 도전해보세요`, '#ffd84a');
+    levelGateWarnCooldowns[key+'_pow'] = now + 12000;
+  }
   return true;
 }
 
 const TOWNS = {
-  town1: { id:'town1', name:'크로노스 마을', spawnPos:new THREE.Vector3(0,0,5), minLevel:1, recLevel:1 },
-  town2: { id:'town2', name:'항만 마을',     spawnPos:new THREE.Vector3(TOWN2_CENTER.x,0,TOWN2_CENTER.z+5), minLevel:8, recLevel:12 },
-  town3: { id:'town3', name:'사막 마을',     spawnPos:new THREE.Vector3(TOWN3_CENTER.x,0,TOWN3_CENTER.z+5), minLevel:16, recLevel:20 },
+  town1: { id:'town1', name:'크로노스 마을', spawnPos:new THREE.Vector3(0,0,5), minLevel:1, recLevel:1, recPower:150 },
+  town2: { id:'town2', name:'항만 마을',     spawnPos:new THREE.Vector3(TOWN2_CENTER.x,0,TOWN2_CENTER.z+5), minLevel:8, recLevel:12, recPower:600 },
+  town3: { id:'town3', name:'사막 마을',     spawnPos:new THREE.Vector3(TOWN3_CENTER.x,0,TOWN3_CENTER.z+5), minLevel:16, recLevel:20, recPower:950 },
 };
 
 function travelToTown(townId){
@@ -3389,6 +3413,10 @@ function travelToTown(townId){
     spawnToast(`${town.name}(으)로 이동했습니다`, '#8ad8ff');
     if(player.level < town.recLevel){
       spawnToast(`⚠ 권장 레벨 Lv.${town.recLevel} 미만입니다. 주의하세요`, '#ffd84a');
+    }
+    const myPower = computePlayerPower();
+    if(town.recPower && myPower < town.recPower){
+      spawnToast(`⚠ 추천 전투력 ${town.recPower} 미만입니다 (내 전투력 ${myPower})`, '#ffd84a');
     }
     refreshHUD();
     saveGame(true);
@@ -4364,14 +4392,16 @@ const travelPanel = document.getElementById('travel-panel');
 function renderTravelPanel(){
   const rows = document.getElementById('travel-rows');
   const inDungeon = player.inDungeon;
+  const myPower = computePlayerPower();
   rows.innerHTML = Object.values(TOWNS).map(t=>{
     const isCurrent = player.currentTown === t.id;
     const belowMin = player.level < t.minLevel;
-    const belowRec = player.level < t.recLevel;
+    const belowPower = myPower < t.recPower;
     const reqText = t.minLevel<=1 ? '' :
       `<div class="travel-row-req ${belowMin?'unmet':''}">최소 Lv.${t.minLevel} · 권장 Lv.${t.recLevel}</div>`;
+    const powerText = t.recPower ? `<div class="travel-row-req ${belowPower?'unmet':''}">추천 전투력 ${t.recPower} (내 전투력 ${myPower})</div>` : '';
     return `<div class="travel-row">
-      <div><span class="travel-row-name">${t.name}${isCurrent?' (현재 위치)':''}</span>${reqText}</div>
+      <div><span class="travel-row-name">${t.name}${isCurrent?' (현재 위치)':''}</span>${reqText}${powerText}</div>
       <button class="travel-row-btn" data-town="${t.id}" ${(isCurrent||inDungeon||belowMin)?'disabled':''}>이동하기</button>
     </div>`;
   }).join('');
@@ -4609,11 +4639,11 @@ function forceGoodItem(){
     const slot = choice(Object.keys(setDef.pieces));
     const piece = setDef.pieces[slot];
     return { uid:itemUid++, name:piece.name, slot, rarity:'set', setId:setDef.id, setName:setDef.name, base:{...piece.base}, enhance:0,
-      sockets: SOCKET_COUNT_BY_RARITY.set, runes:[] };
+      sockets: SOCKET_COUNT_BY_RARITY.set, runes:[], identified:false };
   } else {
     const u = choice(UNIQUES);
     return { uid:itemUid++, name:u.name, slot:u.slot, rarity:'unique', base:{...u.base}, flavor:u.flavor, enhance:0,
-      sockets: SOCKET_COUNT_BY_RARITY.unique, runes:[] };
+      sockets: SOCKET_COUNT_BY_RARITY.unique, runes:[], identified:false };
   }
 }
 
@@ -5519,9 +5549,16 @@ function renderInventory(){
       div.appendChild(iconDiv);
       const nameDiv = document.createElement('div');
       nameDiv.className = 'item-name-small';
-      nameDiv.style.color = rc;
-      nameDiv.textContent = item.name;
+      nameDiv.style.color = item.identified===false ? '#999' : rc;
+      nameDiv.textContent = item.identified===false ? `미감정 ${SLOT_LABEL[item.slot]}` : item.name;
       div.appendChild(nameDiv);
+      if(item.identified===false){
+        const unidBadge = document.createElement('div');
+        unidBadge.className = 'unident-badge';
+        unidBadge.textContent = '❓';
+        unidBadge.title = '미감정 아이템 (클릭해서 감정)';
+        div.appendChild(unidBadge);
+      }
       if(item.enhance>0){
         const badge = document.createElement('div');
         badge.className = 'enh-badge';
@@ -5566,6 +5603,7 @@ function renderCharStats(){
   const s = getTotalStats();
   const el = document.getElementById('char-stats');
   el.innerHTML = `
+    <div style="color:#ffd84a;">전투력</div><div style="color:#ffd84a;">${computePlayerPower()}</div>
     <div>공격력</div><div>${s.atk}</div>
     <div>방어력</div><div>${s.def}</div>
     <div>체력</div><div>${s.hp}</div>
@@ -5574,6 +5612,32 @@ function renderCharStats(){
     <div>레벨</div><div>${player.level}</div>
     ${player.statPoints>0?`<div style="color:var(--gold);">분배 가능</div><div style="color:var(--gold);">${player.statPoints}P</div>`:''}
   `;
+}
+
+// 미감정 아이템 감정: 골드를 내면 진짜 이름/옵션이 공개된다
+function identifyItem(item){
+  if(item.identified !== false) return;
+  const cost = identifyCost(item);
+  if(player.gold < cost){ spawnToast(`골드가 부족합니다 (${cost}G 필요)`, '#888'); return; }
+  player.gold -= cost;
+  item.identified = true;
+  spawnToast(`✨ 감정 완료: ${item.name}!`, RARITY[item.rarity].color);
+  SFX.enhanceSuccess();
+  refreshHUD(); renderInventory(); renderDetail(); saveGame(true);
+}
+// 인벤토리 내 미감정 아이템을 한번에 감정 (비용은 합산)
+function identifyAllItems(){
+  const targets = player.inventory.filter(i=>i.identified===false);
+  if(targets.length===0){ spawnToast('감정할 아이템이 없습니다', '#888'); return; }
+  const total = targets.reduce((sum,i)=>sum+identifyCost(i),0);
+  if(player.gold < total){ spawnToast(`골드가 부족합니다 (${total}G 필요, 미감정 ${targets.length}개)`, '#888'); return; }
+  showConfirm(`미감정 아이템 ${targets.length}개를 모두 감정할까요?\n비용: ${total}G`, ()=>{
+    player.gold -= total;
+    targets.forEach(i=>{ i.identified = true; });
+    spawnToast(`✨ ${targets.length}개 아이템 감정 완료!`, '#4dd9ff');
+    SFX.enhanceSuccess();
+    refreshHUD(); renderInventory(); renderDetail(); saveGame(true);
+  });
 }
 
 function selectItem(item, from){
@@ -5592,15 +5656,20 @@ function renderDetail(){
   const isGem = item.slot === 'gem';
   const isFusion = item.slot === 'fusion';
   const isSocketable = isRune || isGem || isFusion;
+  const isUnidentified = item.identified === false;
   const rc = isGem ? GEMS[item.gemId].color : RARITY[item.rarity].color;
 
-  document.getElementById('detail-name').textContent = (item.enhance>0?`+${item.enhance} `:'')+item.name;
-  document.getElementById('detail-name').style.color = rc;
-  document.getElementById('detail-type').textContent = isGem
+  document.getElementById('detail-name').textContent = isUnidentified ? `미감정 ${SLOT_LABEL[item.slot]}` : (item.enhance>0?`+${item.enhance} `:'')+item.name;
+  document.getElementById('detail-name').style.color = isUnidentified ? '#999' : rc;
+  document.getElementById('detail-type').textContent = isUnidentified
+    ? `${SLOT_LABEL[item.slot]} · ${RARITY[item.rarity].label} (미감정)`
+    : isGem
     ? `${SLOT_LABEL[item.slot]} · ${GEM_TIER_LABELS[item.tier]}`
     : `${SLOT_LABEL[item.slot]} · ${RARITY[item.rarity].label}${item.setName?' · '+item.setName:''}`;
 
-  if(isRune){
+  if(isUnidentified){
+    document.getElementById('detail-stats').innerHTML = `<span style="color:#888;">??? · ??? · ???<br>감정하면 옵션이 공개됩니다.</span>`;
+  } else if(isRune){
     const rd = RUNES[item.runeId];
     const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
     const statsText = Object.entries(rd.stats).map(([k,v])=>`${labels[k]||k} +${v}${k==='crit'?'%':''}`).join('<br>');
@@ -5619,33 +5688,42 @@ function renderDetail(){
   }
 
   const setInfo = document.getElementById('detail-set-info');
-  if(item.setId){
+  if(item.setId && !isUnidentified){
     setInfo.innerHTML = SETS[item.setId].bonuses.map(b=>b.desc).join('<br>');
   } else { setInfo.innerHTML=''; }
 
-  renderSocketSection(item, isSocketable);
+  const identifyBtn = document.getElementById('btn-identify');
+  if(isUnidentified){
+    document.getElementById('socket-info').innerHTML = '';
+    identifyBtn.style.display = 'inline-block';
+    identifyBtn.textContent = `🔍 감정하기 (${identifyCost(item)}G)`;
+    identifyBtn.disabled = player.gold < identifyCost(item);
+  } else {
+    renderSocketSection(item, isSocketable);
+    identifyBtn.style.display = 'none';
+  }
 
   const isEquipped = selectedItem.from !== 'inv';
   const upgradeHint = document.getElementById('detail-upgrade-hint');
   const itemIsUpgrade = !isEquipped && !isSocketable && isUpgrade(item);
   upgradeHint.classList.toggle('hidden', !itemIsUpgrade);
   const equipBtn = document.getElementById('btn-equip');
-  equipBtn.style.display = (isEquipped || isSocketable) ? 'none':'inline-block';
+  equipBtn.style.display = (isEquipped || isSocketable || isUnidentified) ? 'none':'inline-block';
   equipBtn.classList.toggle('upgrade', itemIsUpgrade);
   equipBtn.textContent = itemIsUpgrade ? '⬆ 즉시 장착' : '장착';
   document.getElementById('btn-unequip').style.display = isEquipped ? 'inline-block':'none';
   const disBtn = document.getElementById('btn-disassemble');
-  disBtn.style.display = (isEquipped || isSocketable || item.isGrowthWeapon) ? 'none' : 'inline-block';
+  disBtn.style.display = (isEquipped || isSocketable || item.isGrowthWeapon || isUnidentified) ? 'none' : 'inline-block';
   disBtn.textContent = `🔨 분해 (강화석 +${DISASSEMBLE_YIELD[item.rarity]||1})`;
   const sellBtn = document.getElementById('btn-sell');
-  sellBtn.style.display = (isEquipped || item.isGrowthWeapon) ? 'none' : 'inline-block';
+  sellBtn.style.display = (isEquipped || item.isGrowthWeapon || isUnidentified) ? 'none' : 'inline-block';
   sellBtn.textContent = `🪙 판매 (${getSellValue(item)}G)`;
 
-  // 강화 정보 (룬/보석은 강화 불가)
+  // 강화 정보 (룬/보석은 강화 불가, 미감정 아이템도 감정 전까지 강화 불가)
   const enhanceInfoEl = document.getElementById('enhance-info');
   const enhanceBtn = document.getElementById('btn-enhance');
   const stoneBtn = document.getElementById('btn-use-stone');
-  if(isSocketable){
+  if(isSocketable || isUnidentified){
     enhanceInfoEl.innerHTML = '';
     enhanceBtn.style.display = 'none';
     stoneBtn.style.display = 'none';
@@ -5768,6 +5846,7 @@ function insertFusion(targetSlot){
 }
 
 function equipItem(item){
+  if(item.identified === false){ spawnToast('먼저 감정해야 장착할 수 있습니다', '#888'); return; }
   const slot = item.slot;
   const old = player.equipment[slot];
   player.equipment[slot] = item;
@@ -5786,6 +5865,11 @@ function quickEquip(item){
 document.getElementById('btn-equip').addEventListener('click', ()=>{
   if(!selectedItem || selectedItem.from!=='inv') return;
   equipItem(selectedItem.item);
+});
+
+document.getElementById('btn-identify').addEventListener('click', ()=>{
+  if(!selectedItem) return;
+  identifyItem(selectedItem.item);
 });
 
 document.getElementById('btn-unequip').addEventListener('click', ()=>{
@@ -5856,7 +5940,7 @@ document.getElementById('btn-sell').addEventListener('click', ()=>{
 // 현재 설정된 잡템 기준(player.junkThreshold) 이하 등급 아이템을 한번에 판매
 function sellJunkItems(){
   const maxTier = RARITY_TIER[player.junkThreshold];
-  const junk = player.inventory.filter(i=>RARITY_TIER[i.rarity] !== undefined && RARITY_TIER[i.rarity] <= maxTier);
+  const junk = player.inventory.filter(i=>RARITY_TIER[i.rarity] !== undefined && RARITY_TIER[i.rarity] <= maxTier && i.identified !== false);
   if(junk.length===0){ spawnToast('판매할 잡템이 없습니다', '#888'); return 0; }
   const total = junk.reduce((sum,i)=>sum+(SELL_VALUE[i.rarity]||8),0);
   const junkUids = new Set(junk.map(i=>i.uid));
@@ -5869,6 +5953,7 @@ function sellJunkItems(){
 }
 
 document.getElementById('btn-sell-junk').addEventListener('click', sellJunkItems);
+document.getElementById('btn-identify-all').addEventListener('click', identifyAllItems);
 
 const junkSelect = document.getElementById('junk-threshold-select');
 JUNK_RARITY_OPTIONS.forEach(key=>{
@@ -5921,11 +6006,16 @@ function showTooltip(e, item){
   } else if(item.slot === 'material'){
     statsHtml = '아이템 제작에 사용되는 재료입니다. (G: 조합 및 제작)';
     typeLine = `${SLOT_LABEL[item.slot]} · ${CRAFT_MATERIALS[item.materialId].tier}단계`;
+  } else if(item.identified === false){
+    statsHtml = `<span style="color:#888;">??? · ??? · ???<br>감정하면 옵션이 공개됩니다. (${identifyCost(item)}G)</span>`;
+    typeLine = `${SLOT_LABEL[item.slot]} · ${RARITY[item.rarity].label} (미감정)`;
   } else {
     statsHtml = itemStatsText(item);
     typeLine = `${SLOT_LABEL[item.slot]} · ${RARITY[item.rarity].label}`;
   }
-  tooltipEl.innerHTML = `<b style="color:${rc};">${item.enhance>0?'+'+item.enhance+' ':''}${item.name}</b><br>
+  const dispName = item.identified === false ? `미감정 ${SLOT_LABEL[item.slot]}` : item.name;
+  const dispColor = item.identified === false ? '#999' : rc;
+  tooltipEl.innerHTML = `<b style="color:${dispColor};">${item.enhance>0 && item.identified!==false?'+'+item.enhance+' ':''}${dispName}</b><br>
     <span style="color:#999;">${typeLine}</span><br>${statsHtml}`;
 }
 function hideTooltip(){ tooltipEl.style.display = 'none'; }
