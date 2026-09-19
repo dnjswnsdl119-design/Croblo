@@ -932,8 +932,14 @@ function createRandomItem(monsterLevel){
     }
   }
 
+  // 희귀 등급은 확률적으로 스킬 랭크 강화 옵션이 추가로 붙는다
+  let skillBonus = null;
+  if(rarityKey === 'rare' && Math.random() < 0.35){
+    skillBonus = { key: choice(SKILL_BONUS_POOL), rank: 1 };
+  }
+
   return { uid:itemUid++, name, slot, rarity:rarityKey, base, enhance:0,
-    sockets: SOCKET_COUNT_BY_RARITY[rarityKey]||0, runes:[] };
+    sockets: SOCKET_COUNT_BY_RARITY[rarityKey]||0, runes:[], skillBonus };
 }
 
 // 디아블로 스타일 룬: 장비의 소켓에 삽입해 고정 스탯 보너스를 얻는다
@@ -947,6 +953,31 @@ const RUNES = {
 };
 // 룬 조합 순서: 같은 룬 3개를 모으면 다음 단계 룬 1개로 조합할 수 있다 (조드 룬이 최종 단계)
 const RUNE_ORDER = ['el','tir','ral','ort','sol','zod'];
+
+// 룬워드: 소켓에 정해진 순서대로 룬을 모두 채우면(디아블로 룬워드처럼) 개별 룬 효과에 더해 강력한 추가 옵션이 붙는다.
+// 소켓 수가 정확히 일치해야 하며(빈 소켓 없이), 보석/각인석이 섞여 있으면 성립하지 않는다.
+const RUNEWORDS = [
+  { id:'whisper',      name:'속삭임',       sequence:['el','tir'],                 bonus:{atk:8, crit:3},               flavor:'바람이 검날 위로 속삭인다.' },
+  { id:'guardian',     name:'수호',         sequence:['tir','ral','ort'],          bonus:{def:14, hp:35},               flavor:'무너지지 않는 방벽의 의지.' },
+  { id:'deathsbreath', name:'죽음의 숨결',  sequence:['ral','ort','sol','zod'],    bonus:{atk:18, def:10, hp:40, crit:5}, flavor:'생명이 다하는 순간의 숨결이 깃들었다.' },
+  { id:'orcheart',     name:'오크의 심장',  sequence:['el','tir','ral','ort','sol','zod'], bonus:{atk:30, def:20, hp:80, crit:8}, flavor:'전설 속 오크 대전사의 심장이 고동친다.' },
+];
+// 룬 삽입 직후 호출: 소켓이 룬워드 순서와 정확히 일치하면 아이템에 룬워드를 활성화한다
+function checkRuneword(item){
+  if(!item.sockets || !item.runes) return;
+  if((item.gems && item.gems.length) || (item.fusions && item.fusions.length)) return;
+  const rw = RUNEWORDS.find(r =>
+    r.sequence.length === item.sockets &&
+    item.runes.length === item.sockets &&
+    item.runes.every((id,i)=>id===r.sequence[i])
+  );
+  if(rw && item.activeRuneword !== rw.id){
+    item.activeRuneword = rw.id;
+    if(!item.name.startsWith(`『${rw.name}』`)) item.name = `『${rw.name}』 ${item.name}`;
+    spawnToast(`룬워드 발동: ${rw.name}!`, '#ff5c9a');
+    SFX.enhanceSuccess();
+  }
+}
 
 function createRuneItem(runeId){
   const r = RUNES[runeId];
@@ -1197,6 +1228,24 @@ const CLASS_DEFS = {
 };
 function getClassDef(){ return player.classId ? CLASS_DEFS[player.classId] : null; }
 
+// 희귀 아이템 전용 부가 옵션: 착용 시 특정 슬롯(①~③단계)의 스킬 랭크를 추가로 올려준다.
+// 스킬을 아예 배우지 않았다면 효과가 없으며, 이미 배운 스킬의 위력/재사용시간/소모마력만 강화한다.
+const SKILL_BONUS_POOL = ['s1','s2','s2b','s3'];
+const SKILL_BONUS_LABEL = { s1:'① 기본기', s2:'② 전투 스타일(공격 루트)', s2b:'② 전투 스타일(수호·기동 루트)', s3:'③ 지원기' };
+function getEquipSkillBonus(key){
+  let bonus = 0;
+  EQUIP_SLOTS.forEach(slot=>{
+    const it = player.equipment[slot];
+    if(it && it.skillBonus && it.skillBonus.key === key) bonus += it.skillBonus.rank;
+  });
+  return bonus;
+}
+function getEffectiveSkillRank(key){
+  const raw = player.skillRanks[key] || 0;
+  if(raw <= 0) return 0; // 배우지 않은 스킬은 장비 옵션으로도 활성화되지 않음
+  return raw + getEquipSkillBonus(key);
+}
+
 // 스킬트리: 각 배열의 i번째 항목은 (i+1)랭크를 배우기 위한 요구 레벨/환생 횟수. 배열 길이 = 최대 랭크.
 const SKILL_TREE_REQS = {
   s1: [ {level:1, rebirth:0}, {level:5, rebirth:0}, {level:12, rebirth:1} ],
@@ -1250,6 +1299,10 @@ function getTotalStats(){
       for(const f of item.fusions){
         stats.atk += f.atk||0; stats.def += f.def||0; stats.hp += f.hp||0; stats.crit += f.crit||0;
       }
+    }
+    if(item.activeRuneword){
+      const rw = RUNEWORDS.find(r=>r.id===item.activeRuneword);
+      if(rw){ stats.atk += rw.bonus.atk||0; stats.def += rw.bonus.def||0; stats.hp += rw.bonus.hp||0; stats.crit += rw.bonus.crit||0; }
     }
   }
   const setCounts = {};
@@ -1788,8 +1841,9 @@ function useClassSkill(slotKey){
   const skill = cls.skills[slotKey];
   const state = skillState[slotKey];
   if(state.cd > 0) return;
-  const rank = player.skillRanks[slotKey] || 0;
-  if(rank <= 0){ spawnToast('아직 배우지 않은 스킬입니다 (V: 스킬트리)', '#888'); return; }
+  const rawRank = player.skillRanks[slotKey] || 0;
+  if(rawRank <= 0){ spawnToast('아직 배우지 않은 스킬입니다 (V: 스킬트리)', '#888'); return; }
+  const rank = getEffectiveSkillRank(slotKey); // 장비의 스킬 강화 옵션 반영
   const scale = getSkillRankScale(rank);
   const cost = Math.round((skill.cost||0) * scale.cost);
   if(player.mp < cost){ spawnToast('마력이 부족합니다', '#888'); return; }
@@ -5087,16 +5141,22 @@ function updateBuffRow(){
   row.innerHTML = parts.join('');
 }
 
+const TARGET_UNFOLLOW_RANGE = 20; // 이 거리보다 멀어지면 상태창을 끄고 타겟을 해제한다
 function updateTargetFrame(){
   const frame = document.getElementById('target-frame');
   const t = playerState.targetMonster;
   if(!t || !t.alive){ frame.classList.add('hidden'); return; }
+  const dist = playerState.pos.distanceTo(t.pos);
+  if(dist > TARGET_UNFOLLOW_RANGE){
+    playerState.targetMonster = null;
+    frame.classList.add('hidden');
+    return;
+  }
   frame.classList.remove('hidden');
   document.getElementById('target-name').textContent = (t.def.isBoss?'★ ':'')+t.def.name;
   const pct = Math.max(0, t.hp/t.maxHp*100);
   document.getElementById('target-hp-bar').style.width = pct+'%';
   document.getElementById('target-hp-text').textContent = `${Math.max(0,Math.round(t.hp))}/${t.maxHp}`;
-  const dist = playerState.pos.distanceTo(t.pos);
   const stateLabel = t.state === 'chase' ? '⚔ 교전중' : t.state === 'return' ? '귀환중' : '대기중';
   const rangeLabel = dist <= (t.def.ranged ? (t.def.range||9) : 2.2) ? '' : ' · 사거리 밖';
   document.getElementById('target-status').textContent =
@@ -5230,7 +5290,11 @@ function getSortedGroupedInventory(){
 function itemStatsText(item){
   const s = getScaledStats(item);
   const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
-  return Object.keys(s).map(k=>`${labels[k]||k} +${s[k]}${k==='crit'?'%':''}`).join('<br>');
+  let html = Object.keys(s).map(k=>`${labels[k]||k} +${s[k]}${k==='crit'?'%':''}`).join('<br>');
+  if(item.skillBonus){
+    html += `<br><span style="color:#ff8ccf;">${SKILL_BONUS_LABEL[item.skillBonus.key]} 스킬 랭크 +${item.skillBonus.rank}</span>`;
+  }
+  return html;
 }
 
 function renderInventory(){
@@ -5469,7 +5533,23 @@ function renderSocketSection(item, isSocketable){
     const gemNames = (item.gems||[]).map(g=>`${GEM_TIER_LABELS[g.tier]} ${GEMS[g.gemId]?.name}`);
     const fusionNames = (item.fusions||[]).map((f,i)=>`각인석${i+1}`);
     const names = [...runeNames, ...gemNames, ...fusionNames].join(', ');
-    el.innerHTML = `<div class="socket-title">🔮 소켓 ${used}/${item.sockets}</div>${pips}${names?`<div style="margin-top:4px;">삽입됨: ${names}</div>`:''}`;
+    let runewordHtml = '';
+    if(item.activeRuneword){
+      const rw = RUNEWORDS.find(r=>r.id===item.activeRuneword);
+      if(rw){
+        const bonusText = Object.entries(rw.bonus).map(([k,v])=>{
+          const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
+          return `${labels[k]||k} +${v}${k==='crit'?'%':''}`;
+        }).join(' · ');
+        runewordHtml = `<div style="margin-top:6px;color:#ff5c9a;font-weight:bold;">『${rw.name}』 룬워드 발동</div><div style="color:#ff9ac2;font-size:11px;">${bonusText}</div>`;
+      }
+    } else {
+      const wordsForCount = RUNEWORDS.filter(r=>r.sequence.length===item.sockets);
+      if(wordsForCount.length && item.runes && !(item.gems&&item.gems.length) && !(item.fusions&&item.fusions.length)){
+        runewordHtml = `<div style="margin-top:6px;color:#888;font-size:10px;">이 소켓 수(${item.sockets})로 만들 수 있는 룬워드: ${wordsForCount.map(r=>`${r.name}(${r.sequence.map(id=>RUNES[id].name.replace(' 룬','')).join('+')})`).join(', ')}</div>`;
+      }
+    }
+    el.innerHTML = `<div class="socket-title">🔮 소켓 ${used}/${item.sockets}</div>${pips}${names?`<div style="margin-top:4px;">삽입됨: ${names}</div>`:''}${runewordHtml}`;
   }
 }
 
@@ -5483,6 +5563,7 @@ function insertRune(targetSlot){
   eq.runes.push(runeItem.runeId);
   player.inventory = player.inventory.filter(i=>i.uid!==runeItem.uid);
   spawnToast(`${RUNES[runeItem.runeId].name} 삽입: ${eq.name}`, '#c77dff');
+  checkRuneword(eq);
   selectedItem = null;
   renderInventory(); renderDetail(); refreshHUD();
 }
