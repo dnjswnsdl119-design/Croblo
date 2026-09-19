@@ -2072,15 +2072,14 @@ function spawnMonster(typeKey, x, z, opts){
 }
 
 function initialSpawn(){
-  const positions = [
-    [10,5],[16,-8],[-10,8],[-18,-5],[5,-18],[22,14],[-22,10],[14,20],
-    [-8,-20],[20,-15],[-15,18],[8,15],[-24,-12],[26,3]
-  ];
-  positions.forEach((p,i)=>{
-    if(Math.hypot(p[0],p[1]) < TOWN_RADIUS) return; // 마을 안전지대는 스폰 제외
-    const type = i%7===0 ? 'archer' : i%7===3 ? 'orc' : i%5===0 ? 'wolf' : 'goblin';
-    spawnMonster(type, p[0], p[1]);
-  });
+  const count = 42; // 필드 몹 수 3배 (기존 14마리 -> 42마리)
+  for(let i=0;i<count;i++){
+    const angle = rand(0,Math.PI*2), r = rand(TOWN_RADIUS+2, 40);
+    const x = Math.cos(angle)*r, z = Math.sin(angle)*r;
+    const roll = Math.random();
+    const type = roll<0.12?'archer':roll<0.24?'orc':roll<0.5?'wolf':'goblin';
+    spawnMonster(type, x, z);
+  }
   spawnMonster('chief', -30, -30);
 }
 initialSpawn();
@@ -2725,12 +2724,14 @@ function buildTown2(){
   npcs.push(makeNPC('항구 촌장 델마', 'harbor_elder', TOWN2_CENTER.x+2.4, TOWN2_CENTER.z+3.2, 0x2a5a7a, 0xffd84a));
   npcs.push(makeNPC('행상인 유나', 'harbor_merchant', TOWN2_CENTER.x-4.2, TOWN2_CENTER.z+1.8, 0x3a7a8a, 0x4a9eff));
 
-  // 항만 주변 필드 몬스터 (항만 마을 테마 몬스터 위주, 권장레벨에 맞춰 던전1 몬스터도 일부 섞음)
-  const fieldSpots = [[18,10],[-16,14],[22,-8],[-20,-10],[10,22],[-14,-20]];
-  fieldSpots.forEach(([dx,dz],i)=>{
-    const type = i%3===0 ? 'drowned' : i%2===0 ? 'seaghost' : 'orc';
-    spawnMonster(type, TOWN2_CENTER.x+dx, TOWN2_CENTER.z+dz);
-  });
+  // 항만 주변 필드 몬스터 (항만 마을 테마 몬스터 위주, 권장레벨에 맞춰 던전1 몬스터도 일부 섞음). 필드 몹 수 3배로 확대.
+  for(let i=0;i<18;i++){
+    const angle = rand(0,Math.PI*2), r = rand(TOWN_RADIUS+4, 32);
+    const x = TOWN2_CENTER.x + Math.cos(angle)*r, z = TOWN2_CENTER.z + Math.sin(angle)*r;
+    const roll = Math.random();
+    const type = roll<0.35 ? 'drowned' : roll<0.65 ? 'seaghost' : 'orc';
+    spawnMonster(type, x, z);
+  }
 }
 buildTown2();
 
@@ -2765,12 +2766,14 @@ function buildTown3(){
   npcs.push(makeNPC('사막 족장 라시드', 'desert_elder', TOWN3_CENTER.x+2.4, TOWN3_CENTER.z+3.2, 0x8a6a2a, 0xffd84a));
   npcs.push(makeNPC('떠돌이 상인 카심', 'desert_merchant', TOWN3_CENTER.x-4.2, TOWN3_CENTER.z+1.8, 0xa07a3a, 0x4a9eff));
 
-  // 사막 마을 테마 몬스터 위주 필드 스폰
-  const fieldSpots = [[18,10],[-16,14],[22,-8],[-20,-10],[10,22],[-14,-20]];
-  fieldSpots.forEach(([dx,dz],i)=>{
-    const type = i%3===0 ? 'sandwraith' : i%2===0 ? 'scarab' : 'archer';
-    spawnMonster(type, TOWN3_CENTER.x+dx, TOWN3_CENTER.z+dz);
-  });
+  // 사막 마을 테마 몬스터 위주 필드 스폰. 필드 몹 수 3배로 확대.
+  for(let i=0;i<18;i++){
+    const angle = rand(0,Math.PI*2), r = rand(TOWN_RADIUS+4, 32);
+    const x = TOWN3_CENTER.x + Math.cos(angle)*r, z = TOWN3_CENTER.z + Math.sin(angle)*r;
+    const roll = Math.random();
+    const type = roll<0.35 ? 'sandwraith' : roll<0.65 ? 'scarab' : 'archer';
+    spawnMonster(type, x, z);
+  }
 }
 buildTown3();
 
@@ -5503,7 +5506,7 @@ function hideTooltip(){ tooltipEl.style.display = 'none'; }
 /* ---------------------------- 리스폰 (몬스터 주기적 재생성) ---------------------------- */
 setInterval(()=>{
   const overworldCount = monsters.filter(m=>!m.isDungeon).length;
-  if(overworldCount < 24){
+  if(overworldCount < 72){
     const angle = rand(0,Math.PI*2), r = rand(15,40);
     const x = Math.cos(angle)*r, z = Math.sin(angle)*r;
     if(!collides(x,z,1)){
