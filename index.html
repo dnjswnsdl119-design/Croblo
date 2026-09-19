@@ -97,6 +97,7 @@
   .inv-slot .item-name-small{color:inherit;}
   .inv-slot .enh-badge{position:absolute;top:1px;right:2px;font-size:9px;color:var(--gold);font-weight:bold;}
   .inv-slot .socket-count-badge{position:absolute;bottom:1px;left:2px;font-size:9px;color:#c77dff;font-weight:bold;}
+  .inv-slot .qty-badge{position:absolute;bottom:1px;right:2px;font-size:10px;color:#fff;font-weight:bold;text-shadow:0 1px 2px #000;background:rgba(0,0,0,0.55);border-radius:4px;padding:0 3px;}
   .inv-slot.upgrade{box-shadow:0 0 8px rgba(92,255,138,0.55);}
   .inv-slot.upgrade:hover{box-shadow:0 0 12px rgba(92,255,138,0.8);}
   .upgrade-badge{position:absolute;bottom:1px;right:1px;width:16px;height:16px;border-radius:50%;background:#1a3d24;border:1px solid #5cff8a;color:#5cff8a;font-size:10px;line-height:14px;padding:0;cursor:pointer;animation:upgradePulse 1.4s ease-in-out infinite;}
@@ -1767,6 +1768,8 @@ function useClassSkill(slotKey){
     const range = skill.type.startsWith('ranged') ? (cls.range||8) : 3.4;
     target = (playerState.targetMonster && playerState.targetMonster.alive && playerState.pos.distanceTo(playerState.targetMonster.pos) < range) ? playerState.targetMonster : findNearestMonster(range);
     if(isSingle && !target){ spawnToast('사거리 내에 대상이 없습니다', '#888'); return; }
+    // 클릭 없이 스킬로 공격해도 대상 상태창이 뜨도록 현재 타겟으로 지정
+    if(target) playerState.targetMonster = target;
   }
 
   if(playerState.mounted) toggleMount();
@@ -1792,6 +1795,7 @@ function useClassSkill(slotKey){
     const radius = skill.radius || 3.6;
     const nearby = monsters.filter(m=>m.alive && center.distanceTo(m.pos) < radius);
     if(nearby.length === 0){ spawnToast('주변에 대상이 없습니다', '#888'); }
+    else if(!target) playerState.targetMonster = nearby[0];
     nearby.forEach(m=>{
       const isCrit = Math.random()*100 < stats.crit;
       let dmg = Math.max(1, Math.round(stats.atk*mult*rand(0.9,1.1) - m.def.def*0.5*getDefPenetration()));
@@ -1840,6 +1844,7 @@ function useBasicAttackHotkey(){
   const target = (playerState.targetMonster && playerState.targetMonster.alive && playerState.pos.distanceTo(playerState.targetMonster.pos) < range)
     ? playerState.targetMonster : findNearestMonster(range);
   if(!target){ spawnToast('사거리 내에 대상이 없습니다', '#888'); return; }
+  playerState.targetMonster = target;
   if(playerState.mounted) toggleMount();
   facePosition(target.pos);
   basicAttackState.cd = basicAttackState.cdMax;
@@ -1863,6 +1868,7 @@ function useEvilSpirit(){
   const target = (playerState.targetMonster && playerState.targetMonster.alive) ? playerState.targetMonster : findNearestMonster(20);
   if(target){
     dir = new THREE.Vector3().subVectors(target.pos, playerState.pos); dir.y = 0;
+    playerState.targetMonster = target;
   } else {
     dir = playerState.facing.clone();
   }
@@ -5065,6 +5071,35 @@ function refreshInventoryIfOpen(){
   if(!invPanel.classList.contains('hidden')) renderInventory();
 }
 
+// 인벤토리 표시 정렬/스택: 종류별 -> 등급(높은 순)으로 묶고, 보석/룬처럼 같은 종류+등급이 겹치는 아이템은 개수로 묶어 표시한다
+const INV_TYPE_ORDER = ['weapon','armor','helmet','gloves','belt','boots','accessory','rune','gem','fusion'];
+function getStackKey(item){
+  if(item.slot === 'gem') return `gem_${item.gemId}_${item.tier}`;
+  if(item.slot === 'rune') return `rune_${item.runeId}`;
+  return null; // 장비/유니크/각인석 등은 개체별로 다른 옵션을 가질 수 있어 스택하지 않음
+}
+function invRarityRank(item){
+  if(item.slot === 'gem') return GEM_TIER_MULT[item.tier] || 0;
+  if(item.slot === 'rune') return RUNE_ORDER.indexOf(item.runeId);
+  return RARITY_TIER[item.rarity] ?? 0;
+}
+function getSortedGroupedInventory(){
+  const groups = new Map();
+  const order = [];
+  player.inventory.forEach(item=>{
+    const key = getStackKey(item) || `single_${item.uid}`;
+    if(groups.has(key)) groups.get(key).count++;
+    else { groups.set(key, {item, count:1}); order.push(key); }
+  });
+  const list = order.map(k=>groups.get(k));
+  list.sort((a,b)=>{
+    const ta = INV_TYPE_ORDER.indexOf(a.item.slot), tb = INV_TYPE_ORDER.indexOf(b.item.slot);
+    if(ta !== tb) return ta - tb;
+    return invRarityRank(b.item) - invRarityRank(a.item);
+  });
+  return list;
+}
+
 function itemStatsText(item){
   const s = getScaledStats(item);
   const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
@@ -5102,11 +5137,13 @@ function renderInventory(){
     };
   });
 
-  // 인벤토리 그리드
+  // 인벤토리 그리드 (종류별 -> 등급순 정렬, 보석/룬은 개수로 묶어서 표시)
   const grid = document.getElementById('inv-grid');
   grid.innerHTML = '';
+  const invDisplayList = getSortedGroupedInventory();
   for(let i=0;i<MAX_INVENTORY;i++){
-    const item = player.inventory[i];
+    const entry = invDisplayList[i];
+    const item = entry ? entry.item : null;
     const div = document.createElement('div');
     div.className = 'inv-slot';
     if(item){
@@ -5136,6 +5173,12 @@ function renderInventory(){
         sockBadge.textContent = `🔮${used}/${item.sockets}`;
         sockBadge.title = `소켓 ${used}/${item.sockets}`;
         div.appendChild(sockBadge);
+      }
+      if(entry.count > 1){
+        const qtyBadge = document.createElement('div');
+        qtyBadge.className = 'qty-badge';
+        qtyBadge.textContent = '×'+entry.count;
+        div.appendChild(qtyBadge);
       }
       if(isUpgrade(item)){
         div.classList.add('upgrade');
