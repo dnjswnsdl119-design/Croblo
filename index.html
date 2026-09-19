@@ -417,7 +417,7 @@
       <span class="key">3</span>
       <span class="icon">📣</span>
     </div>
-    <div class="action-slot" id="slot-skill4" title="악령 소환: 전방으로 나아가며 지속 피해를 주는 악령을 소환">
+    <div class="action-slot" id="slot-skill4">
       <span class="key">4</span>
       <span class="icon">👻</span>
     </div>
@@ -429,7 +429,7 @@
 
   <div id="hidden-slots" style="display:none;">
     <div class="action-slot" id="slot-basic">
-      <span class="key">Z</span>
+      <span class="key">`</span>
       <span class="icon">🗡️</span>
     </div>
     <div class="action-slot" id="slot-dodge">
@@ -702,26 +702,26 @@ const AFFIX_POOL = ['atk','def','hp','crit'];
 
 // 몬스터 정의
 const MONSTER_DEFS = {
-  goblin: { name:'고블린', hp:30, atk:5, def:1, speed:2.2, xp:15, goldMin:4, goldMax:9, color:0x5a8a4a, scale:1.0, aggro:7 },
-  wolf:   { name:'늑대',   hp:22, atk:7, def:0, speed:3.4, xp:12, goldMin:3, goldMax:7, color:0x777788, scale:0.9, aggro:9 },
-  chief:  { name:'고블린 대장', hp:90, atk:11, def:3, speed:1.8, xp:45, goldMin:20, goldMax:35, color:0xcc8833, scale:1.6, aggro:8, isBoss:true },
-  orc:    { name:'오크 전사', hp:55, atk:13, def:4, speed:1.7, xp:26, goldMin:8, goldMax:16, color:0x6b5a3a, scale:1.25, aggro:7 },
-  archer: { name:'해골 궁수', hp:18, atk:8, def:0, speed:2.6, xp:20, goldMin:6, goldMax:12, color:0xd8d3c0, scale:0.95, aggro:11,
+  goblin: { name:'고블린', level:2, hp:30, atk:5, def:1, speed:2.2, xp:15, goldMin:4, goldMax:9, color:0x5a8a4a, scale:1.0, aggro:7 },
+  wolf:   { name:'늑대',   level:3, hp:22, atk:7, def:0, speed:3.4, xp:12, goldMin:3, goldMax:7, color:0x777788, scale:0.9, aggro:9 },
+  chief:  { name:'고블린 대장', level:7, hp:90, atk:11, def:3, speed:1.8, xp:45, goldMin:20, goldMax:35, color:0xcc8833, scale:1.6, aggro:8, isBoss:true },
+  orc:    { name:'오크 전사', level:5, hp:55, atk:13, def:4, speed:1.7, xp:26, goldMin:8, goldMax:16, color:0x6b5a3a, scale:1.25, aggro:7 },
+  archer: { name:'해골 궁수', level:4, hp:18, atk:8, def:0, speed:2.6, xp:20, goldMin:6, goldMax:12, color:0xd8d3c0, scale:0.95, aggro:11,
             ranged:true, range:9, minRange:4, projSpeed:14 },
-  orclord:{ name:'오크 군주', hp:220, atk:18, def:6, speed:1.9, xp:120, goldMin:60, goldMax:100, color:0x9a3a2a, scale:2.0, aggro:20, isBoss:true },
-  abysslord:{ name:'심연의 지배자', hp:420, atk:26, def:10, speed:2.0, xp:260, goldMin:120, goldMax:200, color:0x2a4a6a, scale:2.4, aggro:24, isBoss:true },
-  wraith:   { name:'시간을 잃은 망령', hp:48, atk:14, def:2, speed:2.4, xp:34, goldMin:14, goldMax:24, color:0x8a5fd8, scale:1.1, aggro:12, shape:'blob',
+  orclord:{ name:'오크 군주', level:11, hp:220, atk:18, def:6, speed:1.9, xp:120, goldMin:60, goldMax:100, color:0x9a3a2a, scale:2.0, aggro:20, isBoss:true },
+  abysslord:{ name:'심연의 지배자', level:20, hp:420, atk:26, def:10, speed:2.0, xp:260, goldMin:120, goldMax:200, color:0x2a4a6a, scale:2.4, aggro:24, isBoss:true },
+  wraith:   { name:'시간을 잃은 망령', level:14, hp:48, atk:14, def:2, speed:2.4, xp:34, goldMin:14, goldMax:24, color:0x8a5fd8, scale:1.1, aggro:12, shape:'blob',
               ranged:true, range:8, minRange:3, projSpeed:12 },
-  sentinel: { name:'균열의 파수병', hp:130, atk:19, def:9, speed:1.5, xp:70, goldMin:30, goldMax:50, color:0x4a5a7a, scale:1.7, aggro:10, shape:'crystal' },
-  tentacle: { name:'심연의 촉수', hp:75, atk:16, def:5, speed:1.2, xp:48, goldMin:20, goldMax:34, color:0x2a6a5a, scale:1.35, aggro:9, shape:'blob' },
-  drowned:  { name:'익사한 선원', hp:75, atk:18, def:6, speed:1.8, xp:44, goldMin:18, goldMax:30, color:0x3a5a5a, scale:1.2, aggro:9 },
-  seaghost: { name:'저주받은 뱃사공', hp:55, atk:16, def:3, speed:2.2, xp:36, goldMin:14, goldMax:24, color:0x5a8a9a, scale:1.05, aggro:11, shape:'blob',
+  sentinel: { name:'균열의 파수병', level:17, hp:130, atk:19, def:9, speed:1.5, xp:70, goldMin:30, goldMax:50, color:0x4a5a7a, scale:1.7, aggro:10, shape:'crystal' },
+  tentacle: { name:'심연의 촉수', level:15, hp:75, atk:16, def:5, speed:1.2, xp:48, goldMin:20, goldMax:34, color:0x2a6a5a, scale:1.35, aggro:9, shape:'blob' },
+  drowned:  { name:'익사한 선원', level:11, hp:75, atk:18, def:6, speed:1.8, xp:44, goldMin:18, goldMax:30, color:0x3a5a5a, scale:1.2, aggro:9 },
+  seaghost: { name:'저주받은 뱃사공', level:13, hp:55, atk:16, def:3, speed:2.2, xp:36, goldMin:14, goldMax:24, color:0x5a8a9a, scale:1.05, aggro:11, shape:'blob',
               ranged:true, range:8, minRange:3, projSpeed:13 },
-  pirateking: { name:'잊혀진 해적왕', hp:480, atk:28, def:11, speed:1.8, xp:280, goldMin:130, goldMax:210, color:0x2a3a4a, scale:2.3, aggro:22, isBoss:true },
-  sandwraith: { name:'모래 망령', hp:65, atk:19, def:4, speed:2.3, xp:40, goldMin:16, goldMax:27, color:0xd8b878, scale:1.1, aggro:11, shape:'blob',
+  pirateking: { name:'잊혀진 해적왕', level:24, hp:480, atk:28, def:11, speed:1.8, xp:280, goldMin:130, goldMax:210, color:0x2a3a4a, scale:2.3, aggro:22, isBoss:true },
+  sandwraith: { name:'모래 망령', level:19, hp:65, atk:19, def:4, speed:2.3, xp:40, goldMin:16, goldMax:27, color:0xd8b878, scale:1.1, aggro:11, shape:'blob',
               ranged:true, range:8, minRange:3, projSpeed:13 },
-  scarab:   { name:'저주받은 풍뎅이', hp:45, atk:15, def:3, speed:3.0, xp:30, goldMin:11, goldMax:19, color:0x4a3a2a, scale:0.85, aggro:10 },
-  pharaoh:  { name:'파라오의 저주', hp:560, atk:31, def:13, speed:1.7, xp:320, goldMin:150, goldMax:240, color:0xc9a227, scale:2.35, aggro:22, isBoss:true, shape:'crystal' },
+  scarab:   { name:'저주받은 풍뎅이', level:18, hp:45, atk:15, def:3, speed:3.0, xp:30, goldMin:11, goldMax:19, color:0x4a3a2a, scale:0.85, aggro:10 },
+  pharaoh:  { name:'파라오의 저주', level:30, hp:560, atk:31, def:13, speed:1.7, xp:320, goldMin:150, goldMax:240, color:0xc9a227, scale:2.35, aggro:22, isBoss:true, shape:'crystal' },
 };
 
 // 퀘스트 정의
@@ -831,12 +831,21 @@ const SFX = {
   waveClear:      ()=> { tone(523,0.1,'triangle',0.12); tone(659,0.1,'triangle',0.12,0.1); tone(784,0.18,'triangle',0.14,0.2); },
 };
 
-function weightedRarity(){
-  const total = Object.values(RARITY).reduce((s,r)=>s+r.weight,0);
+// 몬스터 레벨이 높을수록 상위 등급 드랍 확률이 올라가도록 가중치를 재분배한다
+function weightedRarity(monsterLevel){
+  const bonus = clamp(((monsterLevel||1)-1)*1.6, 0, 40);
+  const weights = {
+    normal: Math.max(80, RARITY.normal.weight - bonus*6),
+    magic:  RARITY.magic.weight + bonus*1.5,
+    rare:   RARITY.rare.weight + bonus*2.2,
+    set:    RARITY.set.weight + bonus*0.9,
+    unique: RARITY.unique.weight + bonus*0.6,
+  };
+  const total = Object.values(weights).reduce((s,w)=>s+w,0);
   let roll = Math.random()*total;
-  for(const r of Object.values(RARITY)){
-    if(roll < r.weight) return r.key;
-    roll -= r.weight;
+  for(const key of Object.keys(weights)){
+    if(roll < weights[key]) return key;
+    roll -= weights[key];
   }
   return 'normal';
 }
@@ -846,8 +855,9 @@ let gameLoaded = false; // loadGame()이 끝나기 전까지 저장을 막아 �
 
 const SOCKET_COUNT_BY_RARITY = { normal:0, magic:1, rare:2, set:4, unique:6 };
 
-function createRandomItem(){
-  const rarityKey = weightedRarity();
+function createRandomItem(monsterLevel){
+  const rarityKey = weightedRarity(monsterLevel);
+  const lvlMult = 1 + Math.max(0, (monsterLevel||1)-1)*0.035;
 
   if(rarityKey === 'set'){
     const setDef = choice(Object.values(SETS));
@@ -878,19 +888,19 @@ function createRandomItem(){
   let base = {};
 
   const primaryStat = PRIMARY_STAT_BY_SLOT[slot];
-  const primaryVal = Math.round(rand(3,7) * rarityDef.mult);
+  const primaryVal = Math.round(rand(3,7) * rarityDef.mult * lvlMult);
   base[primaryStat] = primaryVal;
 
   if(rarityKey === 'magic'){
     name = `${choice(AFFIX_PREFIX.magic)} ${baseName}`;
     const affix = choice(AFFIX_POOL.filter(a=>a!==primaryStat));
-    base[affix] = (base[affix]||0) + Math.round(rand(2,5));
+    base[affix] = (base[affix]||0) + Math.round(rand(2,5) * lvlMult);
   } else if(rarityKey === 'rare'){
     name = `${choice(AFFIX_PREFIX.rare)} ${baseName}`;
     const pool = AFFIX_POOL.filter(a=>a!==primaryStat);
     const n = randi(2,3);
     for(let i=0;i<n && i<pool.length;i++){
-      base[pool[i]] = (base[pool[i]]||0) + Math.round(rand(3,7));
+      base[pool[i]] = (base[pool[i]]||0) + Math.round(rand(3,7) * lvlMult);
     }
   }
 
@@ -915,10 +925,12 @@ function createRuneItem(runeId){
   return { uid:itemUid++, name:r.name, slot:'rune', rarity:'rune', runeId, base:{}, enhance:0 };
 }
 
-function dropRandomRune(x, z){
+function dropRandomRune(x, z, monsterLevel){
   // 상위 룬일수록 드랍 확률이 낮음 (조드 룬은 드랍되지 않고 조합으로만 획득 가능)
+  // 몬스터 레벨이 높을수록 상위 룬 쪽으로 가중치가 이동한다
   const dropPool = RUNE_ORDER.slice(0, -1);
-  const weights = [40, 28, 18, 10, 4];
+  const shift = clamp(((monsterLevel||1)-1)*0.8, 0, 30);
+  const weights = [Math.max(6,40-shift*0.6), 28, 18+shift*0.15, 10+shift*0.25, 4+shift*0.2];
   let roll = Math.random()*weights.reduce((a,b)=>a+b,0);
   let runeId = dropPool[0];
   for(let i=0;i<dropPool.length;i++){
@@ -950,10 +962,15 @@ function gemStatValue(gemId, tier){
   return GEMS[gemId].base * GEM_TIER_MULT[tier];
 }
 
-function dropRandomGem(x, z){
-  // 하급 보석만 드랍, 상위 등급은 조합으로만 획득 가능
+function dropRandomGem(x, z, monsterLevel){
+  // 기본적으로 하급 보석 위주 드랍, 몬스터 레벨이 높으면 더 좋은 등급이 나올 확률이 생긴다 (완벽 등급은 조합 전용)
+  const lvl = monsterLevel||1;
   const gemId = choice(Object.keys(GEMS));
-  const item = createGemItem(gemId, 'chipped');
+  let tier = 'chipped';
+  const roll = Math.random();
+  if(lvl >= 22 && roll < 0.12) tier = 'flawless';
+  else if(lvl >= 12 && roll < 0.22) tier = 'normal';
+  const item = createGemItem(gemId, tier);
   spawnLoot(item, x, z);
 }
 
@@ -1081,6 +1098,9 @@ const CLASS_DEFS = {
       s5:{ name:'결전의 일격',  icon:'💥', type:'melee_single', mult:4.5, cdMax:12, cost:35, desc:'적 하나에게 막대한 피해를 입히는 필살기.' },
       s5b:{ name:'불굴의 의지', icon:'🛡️', type:'buff_def', bonus:1.1, duration:8, cdMax:20, cost:40, desc:'일정 시간 동안 방어력이 극적으로 증가하는 궁극의 수호 태세.' },
     },
+    skill4:{ name:'검기 파동', icon:'🌊', color:0x5ab0ff, ringColor:0x8ad8ff, dmgColor:'#8ad8ff',
+      cdMax:9, cost:28, speed:5.0, radius:1.8, tickInterval:0.35, dmgMult:0.9, lifeDistance:18,
+      desc:'전방으로 검기를 날려 경로상의 모든 적에게 지속 피해를 입힌다.' },
   },
   savage: {
     id:'savage', name:'새비지', desc:'거대한 무기를 휘두르는 야성의 전사. 최고의 맷집과 지속 전투력.',
@@ -1095,6 +1115,9 @@ const CLASS_DEFS = {
       s5:{ name:'광란의 강타',  icon:'💥', type:'melee_aoe', mult:2.2, radius:4.2, cdMax:14, cost:40, desc:'주변 모든 적을 강타하는 광란의 일격.' },
       s5b:{ name:'피의 갈증',  icon:'🩸', type:'buff_atk_heal', atkBonus:0.6, healPct:0.45, duration:8, cdMax:20, cost:40, desc:'적의 피를 갈망하며 공격력이 크게 오르고 체력을 대폭 회복한다.' },
     },
+    skill4:{ name:'포효의 파동', icon:'🔥', color:0xff6a3a, ringColor:0xffab6a, dmgColor:'#ff8a4a',
+      cdMax:10, cost:32, speed:3.8, radius:2.1, tickInterval:0.4, dmgMult:1.0, lifeDistance:16,
+      desc:'전방으로 나아가며 포효의 화염 파동으로 경로상의 모든 적을 태운다.' },
   },
   valkyrie: {
     id:'valkyrie', name:'발키리', desc:'창과 속도로 적을 베어내는 민첩한 전사. 높은 치명타와 기동력.',
@@ -1109,6 +1132,9 @@ const CLASS_DEFS = {
       s5:{ name:'천공섬',       icon:'💥', type:'melee_single', mult:5.0, cdMax:10, cost:32, desc:'하늘을 가르는 필살의 일격. 극도로 높은 단일 대상 피해.' },
       s5b:{ name:'질풍노도',   icon:'🌪️', type:'buff_speed', mult:2.0, duration:8, cdMax:18, cost:36, desc:'폭풍처럼 몰아치며 이동 속도가 극적으로 빨라진다.' },
     },
+    skill4:{ name:'질풍의 창격', icon:'✨', color:0xffe066, ringColor:0xfff3b0, dmgColor:'#ffe066',
+      cdMax:8, cost:26, speed:6.0, radius:1.6, tickInterval:0.3, dmgMult:0.8, lifeDistance:20,
+      desc:'빛의 창기를 쏘아 보내 빠르게 나아가며 경로상의 모든 적을 연속 타격한다.' },
   },
   magician: {
     id:'magician', name:'매지션', desc:'원소 마법으로 원거리에서 적을 제압하는 지혜의 마법사. 마법 공격은 적의 방어력을 무시합니다. 낮은 방어력에 주의.',
@@ -1123,6 +1149,9 @@ const CLASS_DEFS = {
       s5:{ name:'메테오 스트라이크', icon:'💥', type:'ranged_aoe', mult:2.6, radius:4.5, cdMax:13, cost:45, desc:'하늘에서 유성을 떨어뜨려 넓은 범위에 큰 피해를 입힌다.' },
       s5b:{ name:'빙결의 지배자', icon:'❄️', type:'buff_shield', reduction:0.75, duration:8, cdMax:20, cost:42, desc:'얼음 보호막을 둘러 받는 피해를 극적으로 줄이는 궁극의 방어 마법.' },
     },
+    skill4:{ name:'악령 소환', icon:'👻', color:0x6a2a9a, ringColor:0xaa66ff, dmgColor:'#aa66ff',
+      cdMax:9, cost:30, speed:4.5, radius:1.8, tickInterval:0.35, dmgMult:0.85, lifeDistance:18,
+      desc:'전방으로 나아가며 지속 피해를 주는 악령을 소환한다.' },
   },
 };
 function getClassDef(){ return player.classId ? CLASS_DEFS[player.classId] : null; }
@@ -1802,14 +1831,18 @@ function useBasicAttackHotkey(){
   playerAttack(target);
 }
 
-// 4번 스킬: 악령 소환 (전 직업 공용) - 느리게 전진하며 경로상의 모든 적을 지속 타격
-const EVIL_SPIRIT = { name:'악령 소환', cdMax:9, cost:30, speed:4.5, radius:1.8, tickInterval:0.35, dmgMult:0.85, lifeDistance:18 };
+// 4번 스킬: 클래스별 전방 관통 파동 - 느리게 전진하며 경로상의 모든 적을 지속 타격
+function getSkill4Def(){
+  const cls = getClassDef();
+  return (cls && cls.skill4) ? cls.skill4 : CLASS_DEFS.magician.skill4;
+}
 let evilSpirits = [];
 
 function useEvilSpirit(){
   if(!player.classId || !player.alive) return;
   if(skillState.s4.cd > 0) return;
-  if(player.mp < EVIL_SPIRIT.cost){ spawnToast('마력이 부족합니다', '#888'); return; }
+  const sk = getSkill4Def();
+  if(player.mp < sk.cost){ spawnToast('마력이 부족합니다', '#888'); return; }
   let dir;
   const target = (playerState.targetMonster && playerState.targetMonster.alive) ? playerState.targetMonster : findNearestMonster(20);
   if(target){
@@ -1819,30 +1852,31 @@ function useEvilSpirit(){
   }
   if(dir.lengthSq() < 0.0001) dir = playerState.facing.clone();
   dir.normalize();
-  skillState.s4.cd = EVIL_SPIRIT.cdMax;
-  player.mp = Math.max(0, player.mp - EVIL_SPIRIT.cost);
-  spawnEvilSpirit(playerState.pos.clone(), dir);
-  spawnToast('악령 소환!', '#aa66ff');
+  skillState.s4.cd = sk.cdMax;
+  player.mp = Math.max(0, player.mp - sk.cost);
+  spawnEvilSpirit(playerState.pos.clone(), dir, sk);
+  spawnToast(`${sk.name}!`, sk.dmgColor);
   SFX.crit();
   refreshHUD();
 }
 
-function spawnEvilSpirit(startPos, dir){
-  const color = new THREE.Color(0x6a2a9a);
+function spawnEvilSpirit(startPos, dir, sk){
+  const color = new THREE.Color(sk.color);
   const g = new THREE.Group();
   const core = new THREE.Mesh(new THREE.SphereGeometry(0.38,10,10), new THREE.MeshStandardMaterial({color, emissive:color, emissiveIntensity:0.85, transparent:true, opacity:0.85}));
-  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55,0.07,8,16), new THREE.MeshBasicMaterial({color:0xaa66ff, transparent:true, opacity:0.6}));
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.55,0.07,8,16), new THREE.MeshBasicMaterial({color:sk.ringColor, transparent:true, opacity:0.6}));
   ring.rotation.x = Math.PI/2;
   g.add(core, ring);
   g.position.copy(startPos); g.position.y = 1.3;
   scene.add(g);
-  evilSpirits.push({ mesh:g, pos:startPos.clone(), dir, traveled:0, tickTimer:0 });
+  evilSpirits.push({ mesh:g, pos:startPos.clone(), dir, traveled:0, tickTimer:0, sk });
 }
 
 function updateEvilSpirits(dt){
   for(let i=evilSpirits.length-1; i>=0; i--){
     const s = evilSpirits[i];
-    const step = EVIL_SPIRIT.speed*dt;
+    const sk = s.sk;
+    const step = sk.speed*dt;
     s.pos.x += s.dir.x*step; s.pos.z += s.dir.z*step;
     s.traveled += step;
     s.mesh.position.x = s.pos.x; s.mesh.position.z = s.pos.z;
@@ -1850,21 +1884,21 @@ function updateEvilSpirits(dt){
 
     s.tickTimer -= dt;
     if(s.tickTimer <= 0){
-      s.tickTimer = EVIL_SPIRIT.tickInterval;
+      s.tickTimer = sk.tickInterval;
       const stats = getTotalStats();
-      monsters.filter(m=>m.alive && s.pos.distanceTo(m.pos) < EVIL_SPIRIT.radius).forEach(m=>{
+      monsters.filter(m=>m.alive && s.pos.distanceTo(m.pos) < sk.radius).forEach(m=>{
         const isCrit = Math.random()*100 < stats.crit;
-        let dmg = Math.max(1, Math.round(stats.atk*EVIL_SPIRIT.dmgMult*rand(0.9,1.1) - m.def.def*0.4));
+        let dmg = Math.max(1, Math.round(stats.atk*sk.dmgMult*rand(0.9,1.1) - m.def.def*0.4));
         if(isCrit) dmg = Math.round(dmg*1.8);
         m.hp -= dmg;
         const wp = m.pos.clone(); wp.y = 2.0*m.def.scale;
-        spawnDamageNumberAt(wp, dmg, isCrit, '#aa66ff');
+        spawnDamageNumberAt(wp, dmg, isCrit, sk.dmgColor);
         updateMonsterBar(m);
         if(m.hp <= 0) killMonster(m);
       });
     }
 
-    if(s.traveled >= EVIL_SPIRIT.lifeDistance || collides(s.pos.x, s.pos.z, 0.3)){
+    if(s.traveled >= sk.lifeDistance || collides(s.pos.x, s.pos.z, 0.3)){
       scene.remove(s.mesh);
       evilSpirits.splice(i,1);
     }
@@ -1877,7 +1911,7 @@ window.addEventListener('keydown', (e)=>{
   if(matchKey(e,'Digit3','3')) useClassSkill('s3');
   if(matchKey(e,'Digit4','4')) useEvilSpirit();
   if(matchKey(e,'Digit5','5')) useClassSkill(getActiveUltimateKey());
-  if(matchKey(e,'KeyZ','z')) useBasicAttackHotkey();
+  if(matchKey(e,'Backquote','`')) useBasicAttackHotkey();
 });
 
 function updateWeaponVisual(){
@@ -1959,6 +1993,8 @@ function spawnMonster(typeKey, x, z, opts){
     atk: Math.round(baseDef.atk*(opts.atkMult||1)),
   } : baseDef;
 
+  const level = opts.levelOverride || Math.max(1, Math.round(baseDef.level * (opts.hpMult ? Math.sqrt(opts.hpMult) : 1)));
+
   const g = new THREE.Group();
   const bodyColor = def.color;
   let body;
@@ -2001,11 +2037,11 @@ function spawnMonster(typeKey, x, z, opts){
   document.getElementById('game-container').appendChild(barWrap);
   const nameTag = document.createElement('div');
   nameTag.style.cssText = 'position:absolute;font-size:10px;color:#fff;text-shadow:0 1px 2px #000;pointer-events:none;white-space:nowrap;transform:translate(-50%,-100%);';
-  nameTag.textContent = (def.isBoss?'★ ':'')+(opts.nameOverride||def.name);
+  nameTag.textContent = (def.isBoss?'★ ':'')+`Lv.${level} `+(opts.nameOverride||def.name);
   document.getElementById('game-container').appendChild(nameTag);
 
   const m = {
-    uid: monsterUid++, type:typeKey, def, mesh:g,
+    uid: monsterUid++, type:typeKey, def, mesh:g, level,
     hp: def.hp, maxHp: def.hp,
     pos: new THREE.Vector3(x,0,z),
     home: new THREE.Vector3(x,0,z),
@@ -2673,10 +2709,10 @@ function buildTown2(){
   npcs.push(makeNPC('항구 촌장 델마', 'harbor_elder', TOWN2_CENTER.x+2.4, TOWN2_CENTER.z+3.2, 0x2a5a7a, 0xffd84a));
   npcs.push(makeNPC('행상인 유나', 'harbor_merchant', TOWN2_CENTER.x-4.2, TOWN2_CENTER.z+1.8, 0x3a7a8a, 0x4a9eff));
 
-  // 항만 주변 필드 몬스터 (기존 오버월드 몬스터 재활용)
+  // 항만 주변 필드 몬스터 (항만 마을 테마 몬스터 위주, 권장레벨에 맞춰 던전1 몬스터도 일부 섞음)
   const fieldSpots = [[18,10],[-16,14],[22,-8],[-20,-10],[10,22],[-14,-20]];
   fieldSpots.forEach(([dx,dz],i)=>{
-    const type = i%3===0 ? 'orc' : i%2===0 ? 'archer' : 'wolf';
+    const type = i%3===0 ? 'drowned' : i%2===0 ? 'seaghost' : 'orc';
     spawnMonster(type, TOWN2_CENTER.x+dx, TOWN2_CENTER.z+dz);
   });
 }
@@ -2713,9 +2749,10 @@ function buildTown3(){
   npcs.push(makeNPC('사막 족장 라시드', 'desert_elder', TOWN3_CENTER.x+2.4, TOWN3_CENTER.z+3.2, 0x8a6a2a, 0xffd84a));
   npcs.push(makeNPC('떠돌이 상인 카심', 'desert_merchant', TOWN3_CENTER.x-4.2, TOWN3_CENTER.z+1.8, 0xa07a3a, 0x4a9eff));
 
+  // 사막 마을 테마 몬스터 위주 필드 스폰
   const fieldSpots = [[18,10],[-16,14],[22,-8],[-20,-10],[10,22],[-14,-20]];
   fieldSpots.forEach(([dx,dz],i)=>{
-    const type = i%3===0 ? 'orc' : i%2===0 ? 'archer' : 'goblin';
+    const type = i%3===0 ? 'sandwraith' : i%2===0 ? 'scarab' : 'archer';
     spawnMonster(type, TOWN3_CENTER.x+dx, TOWN3_CENTER.z+dz);
   });
 }
@@ -4145,25 +4182,29 @@ function killMonster(monster){
   monster.alive = false;
   SFX.monsterDeath();
   const dropX = monster.pos.x, dropZ = monster.pos.z;
-  addXP(monster.def.xp);
+  const mLevel = monster.level || 1;
+  // 몬스터가 내 레벨보다 높을수록 경험치/골드 보상이 늘고, 훨씬 낮으면 보상이 줄어든다
+  const rewardMult = clamp(1 + (mLevel - player.level)*0.12, 0.5, 2.5);
+  addXP(Math.max(1, Math.round(monster.def.xp * rewardMult)));
   if(!player.discoveredMonsters.includes(monster.type)) player.discoveredMonsters.push(monster.type);
-  const gold = randi(monster.def.goldMin, monster.def.goldMax);
+  const gold = Math.max(1, Math.round(randi(monster.def.goldMin, monster.def.goldMax) * rewardMult));
   spawnGoldPickup(gold, dropX, dropZ);
 
-  // 보스는 확정 세트/유니크 드랍 확률 상승
-  const dropChance = monster.def.isBoss ? 1.0 : 0.55;
+  // 보스는 확정 세트/유니크 드랍 확률 상승, 일반 몬스터는 레벨이 높을수록 드랍률 상승
+  const dropFactor = clamp(1 + (mLevel-1)*0.03, 1, 2.2);
+  const dropChance = monster.def.isBoss ? 1.0 : Math.min(0.85, 0.55*dropFactor);
   if(Math.random() < dropChance){
-    const item = monster.def.isBoss ? forceGoodItem() : createRandomItem();
+    const item = monster.def.isBoss ? forceGoodItem() : createRandomItem(mLevel);
     spawnLoot(item, dropX + rand(-0.5,0.5), dropZ + rand(-0.5,0.5));
   }
-  if(!monster.def.isBoss && Math.random() < 0.22){
+  if(!monster.def.isBoss && Math.random() < Math.min(0.4, 0.22*dropFactor)){
     spawnPotionPickup(dropX + rand(-0.6,0.6), dropZ + rand(-0.6,0.6));
   }
-  if(Math.random() < (monster.def.isBoss ? 0.5 : 0.08)){
-    dropRandomRune(dropX + rand(-0.7,0.7), dropZ + rand(-0.7,0.7));
+  if(Math.random() < (monster.def.isBoss ? 0.5 : Math.min(0.28, 0.08*dropFactor))){
+    dropRandomRune(dropX + rand(-0.7,0.7), dropZ + rand(-0.7,0.7), mLevel);
   }
-  if(Math.random() < (monster.def.isBoss ? 0.5 : 0.1)){
-    dropRandomGem(dropX + rand(-0.7,0.7), dropZ + rand(-0.7,0.7));
+  if(Math.random() < (monster.def.isBoss ? 0.5 : Math.min(0.3, 0.1*dropFactor))){
+    dropRandomGem(dropX + rand(-0.7,0.7), dropZ + rand(-0.7,0.7), mLevel);
   }
   if(monster.type === 'chief' && !player.hasDungeonKey){
     player.hasDungeonKey = true;
@@ -4559,6 +4600,8 @@ function updateBars(){
     m.barWrap.style.top = y+'px';
     m.nameTag.style.left = x+'px';
     m.nameTag.style.top = (y-4)+'px';
+    const lvlColor = m.level > player.level ? '#ff5c5c' : (m.def.isBoss ? '#ffd84a' : '#fff');
+    if(m.nameTag.style.color !== lvlColor) m.nameTag.style.color = lvlColor;
     if(m.aggroEl){
       m.aggroEl.style.display = visible ? 'block':'none';
       m.aggroEl.style.left = x+'px';
@@ -4663,6 +4706,10 @@ function applySkillUI(){
       rankEl.remove();
     }
   });
+  const sk4 = cls.skill4 || CLASS_DEFS.magician.skill4;
+  const slot4 = document.getElementById('slot-skill4');
+  slot4.querySelector('.icon').textContent = sk4.icon;
+  slot4.title = `${sk4.name}: ${sk4.desc}`;
 }
 
 function selectClass(classId){
