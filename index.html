@@ -150,6 +150,9 @@
   .action-slot .key{position:absolute;top:2px;left:4px;font-size:9px;color:#999;}
   .action-slot .count{position:absolute;bottom:2px;right:4px;font-size:10px;color:var(--gold);font-weight:bold;}
   .action-slot .cd-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.65);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;}
+  .action-slot.locked{opacity:0.4;}
+  .action-slot .lock-overlay{position:absolute;inset:0;background:rgba(0,0,0,0.55);border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:16px;}
+  .action-slot .rank-badge{position:absolute;bottom:2px;left:4px;font-size:9px;color:var(--gold);font-weight:bold;}
 
   /* ---------- 화면 전환 ---------- */
   #fade-overlay{position:absolute;inset:0;background:#000;opacity:0;pointer-events:none;transition:opacity 0.25s ease;z-index:80;}
@@ -215,8 +218,25 @@
   .stat-row-val{font-size:13px;color:var(--gold);width:28px;text-align:center;}
   .stat-row-btn{width:26px;height:26px;border-radius:4px;background:rgba(232,198,106,0.18);border:1px solid var(--gold);color:var(--gold);cursor:pointer;font-size:14px;}
   .stat-row-btn:disabled{opacity:0.25;cursor:not-allowed;}
-  #stat-points-badge{display:inline-block;min-width:16px;height:16px;padding:0 3px;margin-left:4px;background:#e33;color:#fff;border-radius:8px;font-size:10px;line-height:16px;text-align:center;vertical-align:middle;}
-  #stat-points-badge.hidden{display:none;}
+
+  /* ---------- 스킬트리 패널 ---------- */
+  #skilltree-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:420px;max-width:92vw;max-height:82vh;overflow-y:auto;padding:16px;color:#eee;}
+  #skilltree-panel.hidden{display:none;}
+  #skilltree-points-line{font-size:12px;color:#aad4ff;margin-bottom:10px;}
+  #skilltree-points-count{color:var(--gold);font-weight:bold;}
+  .skill-row{padding:10px;background:rgba(255,255,255,0.04);border-radius:7px;margin-bottom:8px;border:1px solid var(--panel-border);}
+  .skill-row.maxed{border-color:var(--gold);}
+  .skill-row-top{display:flex;align-items:center;gap:8px;}
+  .skill-row-icon{font-size:20px;}
+  .skill-row-name{font-size:13px;font-weight:bold;color:#eee;flex:1;}
+  .skill-row-rank{font-size:12px;color:var(--gold);}
+  .skill-row-desc{font-size:11px;color:#999;margin:4px 0;}
+  .skill-row-req{font-size:10px;color:#8ad8ff;margin-bottom:6px;}
+  .skill-row-req.unmet{color:#ff8a8a;}
+  .skill-row-btn{width:100%;padding:7px;border-radius:5px;border:1px solid var(--gold);background:rgba(232,198,106,0.12);color:var(--gold);cursor:pointer;font-size:12px;}
+  .skill-row-btn:disabled{opacity:0.3;cursor:not-allowed;border-color:#555;color:#888;}
+  #stat-points-badge, #skill-points-badge{display:inline-block;min-width:16px;height:16px;padding:0 3px;margin-left:4px;background:#e33;color:#fff;border-radius:8px;font-size:10px;line-height:16px;text-align:center;vertical-align:middle;}
+  #stat-points-badge.hidden, #skill-points-badge.hidden{display:none;}
 
   /* ---------- 저장 초기화 버튼 ---------- */
   #btn-reset-save{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(20,16,10,0.85);border:1px solid var(--panel-border);color:#999;cursor:pointer;font-size:15px;z-index:60;}
@@ -339,13 +359,14 @@
   <div id="toast-container"></div>
   <div id="npc-prompt">E: 대화</div>
 
-  <div id="controls-hint">WASD/방향키·클릭: 이동 · 클릭/Z: 공격 · 1/2/3/4: 스킬 · Space: 회피 · Q: 포션 · R: 탈것 · E: NPC 대화 · I: 인벤토리 · L: 퀘스트 · K: 도감 · C: 능력치</div>
+  <div id="controls-hint">WASD/방향키·클릭: 이동 · 클릭/Z: 공격 · 1/2/3/4/5: 스킬 · Space: 회피 · Q: 포션 · R: 탈것 · E: NPC 대화 · I: 인벤토리 · L: 퀘스트 · K: 도감 · C: 능력치 · V: 스킬트리</div>
 
   <div id="bottom-bar">
     <button id="btn-inventory">🎒 인벤토리 (I)</button>
     <button id="btn-questlog">📜 퀘스트 (L)</button>
     <button id="btn-codex">📖 몬스터 도감 (K)</button>
     <button id="btn-statpanel">✦ 능력치 (C)<span id="stat-points-badge" class="hidden"></span></button>
+    <button id="btn-skilltree">🌳 스킬트리 (V)<span id="skill-points-badge" class="hidden"></span></button>
   </div>
 
   <div id="action-slots">
@@ -368,6 +389,10 @@
     <div class="action-slot" id="slot-skill4">
       <span class="key">4</span>
       <span class="icon">👻</span>
+    </div>
+    <div class="action-slot" id="slot-skill5">
+      <span class="key">5</span>
+      <span class="icon">💥</span>
     </div>
     <div class="action-slot" id="slot-potion">
       <span class="key">Q</span>
@@ -418,6 +443,15 @@
     </div>
     <div id="stat-points-line">배분 가능한 포인트: <span id="stat-points-count">0</span></div>
     <div id="stat-rows"></div>
+  </div>
+
+  <div id="skilltree-panel" class="panel hidden">
+    <div class="ql-header">
+      <h2>스킬트리</h2>
+      <button class="ql-close" id="skilltree-close">✕</button>
+    </div>
+    <div id="skilltree-points-line">스킬 포인트: <span id="skilltree-points-count">0</span></div>
+    <div id="skilltree-rows"></div>
   </div>
 
   <div id="inventory-panel" class="panel hidden">
@@ -862,6 +896,8 @@ const player = {
   statPoints:0,
   allocatedStats:{ str:0, agi:0, int:0, vit:0 },
   junkThreshold:'magic',
+  skillPoints:0,
+  skillRanks:{ s1:0, s2:0, s3:0, s5:0 },
 };
 const JUNK_RARITY_OPTIONS = ['normal','magic','rare','set'];
 const STAT_ALLOC_INFO = {
@@ -892,9 +928,10 @@ const CLASS_DEFS = {
     growth:{ hp:22, atk:3.2, def:2.0, crit:0.25, mp:6 },
     mpRegen:4,
     skills:{
-      s1:{ name:'크리티컬 블로', icon:'⚔️', type:'melee_single', mult:2.6, cdMax:4, cost:15 },
-      s2:{ name:'휩쓸기',       icon:'🌀', type:'melee_aoe',    mult:1.25, radius:3.6, cdMax:6, cost:20 },
-      s3:{ name:'브레이브',      icon:'🛡️', type:'buff_def',    bonus:0.4, duration:6, cdMax:14, cost:20 },
+      s1:{ name:'크리티컬 블로', icon:'⚔️', type:'melee_single', mult:2.6, cdMax:4, cost:15, desc:'적 하나에게 강력한 일격을 가한다.' },
+      s2:{ name:'휩쓸기',       icon:'🌀', type:'melee_aoe',    mult:1.25, radius:3.6, cdMax:6, cost:20, desc:'주변의 적들을 검으로 휩쓴다.' },
+      s3:{ name:'브레이브',      icon:'🛡️', type:'buff_def',    bonus:0.4, duration:6, cdMax:14, cost:20, desc:'일정 시간 동안 방어력이 크게 증가한다.' },
+      s5:{ name:'결전의 일격',  icon:'💥', type:'melee_single', mult:4.5, cdMax:12, cost:35, desc:'적 하나에게 막대한 피해를 입히는 필살기.' },
     },
   },
   savage: {
@@ -904,9 +941,10 @@ const CLASS_DEFS = {
     growth:{ hp:27, atk:2.8, def:2.4, crit:0.2, mp:5 },
     mpRegen:4,
     skills:{
-      s1:{ name:'분쇄의 일격',   icon:'⚔️', type:'melee_single', mult:2.2, cdMax:4, cost:15 },
-      s2:{ name:'스톤스킨',     icon:'🪨', type:'buff_def',     bonus:0.55, duration:6, cdMax:12, cost:20 },
-      s3:{ name:'라이온하트',   icon:'📣', type:'buff_atk_heal', atkBonus:0.28, healPct:0.2, duration:6, cdMax:16, cost:25 },
+      s1:{ name:'분쇄의 일격',   icon:'⚔️', type:'melee_single', mult:2.2, cdMax:4, cost:15, desc:'거대한 무기로 적을 내려찍는다.' },
+      s2:{ name:'스톤스킨',     icon:'🪨', type:'buff_def',     bonus:0.55, duration:6, cdMax:12, cost:20, desc:'피부가 돌처럼 단단해져 방어력이 크게 증가한다.' },
+      s3:{ name:'라이온하트',   icon:'📣', type:'buff_atk_heal', atkBonus:0.28, healPct:0.2, duration:6, cdMax:16, cost:25, desc:'포효하여 공격력을 높이고 체력을 회복한다.' },
+      s5:{ name:'광란의 강타',  icon:'💥', type:'melee_aoe', mult:2.2, radius:4.2, cdMax:14, cost:40, desc:'주변 모든 적을 강타하는 광란의 일격.' },
     },
   },
   valkyrie: {
@@ -916,9 +954,10 @@ const CLASS_DEFS = {
     growth:{ hp:18, atk:3.6, def:1.2, crit:0.55, mp:6 },
     mpRegen:5,
     skills:{
-      s1:{ name:'데들리 어썰트', icon:'⚔️', type:'melee_single', mult:3.1, cdMax:5, cost:18 },
-      s2:{ name:'크러싱 폴',    icon:'🌀', type:'melee_aoe',    mult:1.3, radius:3.6, cdMax:6, cost:20 },
-      s3:{ name:'헤이스트',     icon:'💨', type:'buff_speed',   mult:1.45, duration:5, cdMax:12, cost:20 },
+      s1:{ name:'데들리 어썰트', icon:'⚔️', type:'melee_single', mult:3.1, cdMax:5, cost:18, desc:'번개같은 찌르기로 치명적인 피해를 입힌다.' },
+      s2:{ name:'크러싱 폴',    icon:'🌀', type:'melee_aoe',    mult:1.3, radius:3.6, cdMax:6, cost:20, desc:'창을 내리찍어 주변 적들에게 피해를 입힌다.' },
+      s3:{ name:'헤이스트',     icon:'💨', type:'buff_speed',   mult:1.45, duration:5, cdMax:12, cost:20, desc:'이동 속도가 크게 빨라진다.' },
+      s5:{ name:'천공섬',       icon:'💥', type:'melee_single', mult:5.0, cdMax:10, cost:32, desc:'하늘을 가르는 필살의 일격. 극도로 높은 단일 대상 피해.' },
     },
   },
   magician: {
@@ -928,13 +967,27 @@ const CLASS_DEFS = {
     growth:{ hp:14, atk:4.2, def:0.8, crit:0.4, mp:12 },
     mpRegen:8,
     skills:{
-      s1:{ name:'매직 미사일',   icon:'⚔️', type:'ranged_single', mult:2.3, cdMax:2.6, cost:12 },
-      s2:{ name:'아스트랄 스톰', icon:'🌀', type:'ranged_aoe',    mult:1.4, radius:3.6, cdMax:7, cost:22 },
-      s3:{ name:'매직실드',     icon:'🔰', type:'buff_shield',   reduction:0.4, duration:5, cdMax:14, cost:20 },
+      s1:{ name:'매직 미사일',   icon:'⚔️', type:'ranged_single', mult:2.3, cdMax:2.6, cost:12, desc:'마력탄을 발사해 원거리 피해를 입힌다.' },
+      s2:{ name:'아스트랄 스톰', icon:'🌀', type:'ranged_aoe',    mult:1.4, radius:3.6, cdMax:7, cost:22, desc:'원소의 폭풍을 일으켜 넓은 범위에 피해를 입힌다.' },
+      s3:{ name:'매직실드',     icon:'🔰', type:'buff_shield',   reduction:0.4, duration:5, cdMax:14, cost:20, desc:'마법 보호막을 둘러 받는 피해를 줄인다.' },
+      s5:{ name:'메테오 스트라이크', icon:'💥', type:'ranged_aoe', mult:2.6, radius:4.5, cdMax:13, cost:45, desc:'하늘에서 유성을 떨어뜨려 넓은 범위에 큰 피해를 입힌다.' },
     },
   },
 };
 function getClassDef(){ return player.classId ? CLASS_DEFS[player.classId] : null; }
+
+// 스킬트리: 각 배열의 i번째 항목은 (i+1)랭크를 배우기 위한 요구 레벨/환생 횟수. 배열 길이 = 최대 랭크.
+const SKILL_TREE_REQS = {
+  s1: [ {level:1, rebirth:0}, {level:5, rebirth:0}, {level:12, rebirth:1} ],
+  s2: [ {level:5, rebirth:0}, {level:10, rebirth:0}, {level:16, rebirth:1} ],
+  s3: [ {level:10, rebirth:0}, {level:14, rebirth:1}, {level:20, rebirth:2} ],
+  s5: [ {level:15, rebirth:1} ],
+};
+// 랭크에 따른 위력/재사용시간/소모마력 배율 (랭크1=기본값, 랭크가 오를수록 강해지고 효율이 좋아짐)
+function getSkillRankScale(rank){
+  const r = Math.max(1, rank);
+  return { power: 1+(r-1)*0.15, cd: 1-(r-1)*0.08, cost: 1-(r-1)*0.05 };
+}
 const STONE_COST_GUARANTEE = 3;
 const MAX_POTIONS = 9;
 const POTION_HEAL_PCT = 0.35;
@@ -997,9 +1050,10 @@ function addXP(amount){
     player.baseMp += Math.round(g.mp||5);
     player.xpToNext = Math.round(player.xpToNext*1.3);
     player.statPoints += 3;
+    player.skillPoints += 1;
     player.hp = getTotalStats().hp;
     player.mp = player.baseMp;
-    spawnToast(`레벨 업! Lv.${player.level} (능력치 포인트 +3, C키로 분배)`, '#4a9eff');
+    spawnToast(`레벨 업! Lv.${player.level} (능력치 +3, 스킬 포인트 +1)`, '#4a9eff');
     SFX.levelup();
   }
   refreshHUD();
@@ -1426,6 +1480,7 @@ const skillState = {
   s2: { cd:0 },
   s3: { cd:0 },
   s4: { cd:0 },
+  s5: { cd:0 },
 };
 function findNearestMonster(maxDist){
   let best=null, bestDist=maxDist;
@@ -1477,7 +1532,11 @@ function useClassSkill(slotKey){
   const skill = cls.skills[slotKey];
   const state = skillState[slotKey];
   if(state.cd > 0) return;
-  if(player.mp < (skill.cost||0)){ spawnToast('마력이 부족합니다', '#888'); return; }
+  const rank = player.skillRanks[slotKey] || 0;
+  if(rank <= 0){ spawnToast('아직 배우지 않은 스킬입니다 (V: 스킬트리)', '#888'); return; }
+  const scale = getSkillRankScale(rank);
+  const cost = Math.round((skill.cost||0) * scale.cost);
+  if(player.mp < cost){ spawnToast('마력이 부족합니다', '#888'); return; }
 
   const isSingle = skill.type === 'melee_single' || skill.type === 'ranged_single';
   const isAoe = skill.type === 'melee_aoe' || skill.type === 'ranged_aoe';
@@ -1489,13 +1548,14 @@ function useClassSkill(slotKey){
   }
 
   if(playerState.mounted) toggleMount();
-  state.cd = skill.cdMax;
-  player.mp = Math.max(0, player.mp - (skill.cost||0));
+  state.cd = skill.cdMax * scale.cd;
+  player.mp = Math.max(0, player.mp - cost);
   const stats = getTotalStats();
+  const mult = (skill.mult||0) * scale.power;
 
   if(isSingle){
     const isCrit = Math.random()*100 < stats.crit;
-    let dmg = Math.max(1, Math.round(stats.atk*skill.mult*rand(0.9,1.1) - target.def.def*0.5*getDefPenetration()));
+    let dmg = Math.max(1, Math.round(stats.atk*mult*rand(0.9,1.1) - target.def.def*0.5*getDefPenetration()));
     if(isCrit) dmg = Math.round(dmg*1.8);
     target.hp -= dmg;
     const wp = target.pos.clone(); wp.y = 2.2*target.def.scale;
@@ -1512,7 +1572,7 @@ function useClassSkill(slotKey){
     if(nearby.length === 0){ spawnToast('주변에 대상이 없습니다', '#888'); }
     nearby.forEach(m=>{
       const isCrit = Math.random()*100 < stats.crit;
-      let dmg = Math.max(1, Math.round(stats.atk*skill.mult*rand(0.9,1.1) - m.def.def*0.5*getDefPenetration()));
+      let dmg = Math.max(1, Math.round(stats.atk*mult*rand(0.9,1.1) - m.def.def*0.5*getDefPenetration()));
       if(isCrit) dmg = Math.round(dmg*1.8);
       m.hp -= dmg;
       const wp = m.pos.clone(); wp.y = 2.0*m.def.scale;
@@ -1524,24 +1584,24 @@ function useClassSkill(slotKey){
     if(skill.type==='ranged_aoe') spawnCastBolt(playerState.pos, center, 0x8a5aff);
     SFX.crit();
   } else if(skill.type === 'buff_def'){
-    player.buffs.defMult = 1+skill.bonus;
+    player.buffs.defMult = 1+skill.bonus*scale.power;
     player.buffTimers.def = skill.duration;
     spawnToast(`${skill.name}! 방어력 증가`, '#8ad8ff');
     SFX.levelup();
   } else if(skill.type === 'buff_atk_heal'){
-    player.buffs.atkMult = 1+skill.atkBonus;
+    player.buffs.atkMult = 1+skill.atkBonus*scale.power;
     player.buffTimers.atk = skill.duration;
     const heal = Math.round(stats.hp*skill.healPct);
     player.hp = Math.min(stats.hp, player.hp+heal);
     spawnToast(`${skill.name}! 공격력 증가 + 체력 회복`, '#8ad8ff');
     SFX.levelup();
   } else if(skill.type === 'buff_speed'){
-    player.buffs.speedMult = skill.mult;
+    player.buffs.speedMult = 1+(skill.mult-1)*scale.power;
     player.buffTimers.speed = skill.duration;
     spawnToast(`${skill.name}! 이동속도 증가`, '#8ad8ff');
     SFX.dodge();
   } else if(skill.type === 'buff_shield'){
-    player.buffs.dmgReduction = skill.reduction;
+    player.buffs.dmgReduction = skill.reduction*scale.power;
     player.buffTimers.dmgReduction = skill.duration;
     spawnToast(`${skill.name}! 피해 감소`, '#8ad8ff');
     SFX.levelup();
@@ -1639,6 +1699,7 @@ window.addEventListener('keydown', (e)=>{
   if(matchKey(e,'Digit2','2')) useClassSkill('s2');
   if(matchKey(e,'Digit3','3')) useClassSkill('s3');
   if(matchKey(e,'Digit4','4')) useEvilSpirit();
+  if(matchKey(e,'Digit5','5')) useClassSkill('s5');
   if(matchKey(e,'KeyZ','z')) useBasicAttackHotkey();
 });
 
@@ -2404,7 +2465,7 @@ const questLogPanel = document.getElementById('quest-log-panel');
 const codexPanel = document.getElementById('codex-panel');
 
 function isAnyPanelOpen(){
-  return !invPanel.classList.contains('hidden') || !npcPanel.classList.contains('hidden') || !questLogPanel.classList.contains('hidden') || !codexPanel.classList.contains('hidden') || !document.getElementById('stat-panel').classList.contains('hidden');
+  return !invPanel.classList.contains('hidden') || !npcPanel.classList.contains('hidden') || !questLogPanel.classList.contains('hidden') || !codexPanel.classList.contains('hidden') || !document.getElementById('stat-panel').classList.contains('hidden') || !document.getElementById('skilltree-panel').classList.contains('hidden');
 }
 
 function updateNPCs(dt){
@@ -2752,6 +2813,70 @@ function toggleStatPanel(){
 document.getElementById('stat-close').addEventListener('click', toggleStatPanel);
 document.getElementById('btn-statpanel').addEventListener('click', toggleStatPanel);
 
+/* ---------------------------- 스킬트리 ---------------------------- */
+
+const skilltreePanel = document.getElementById('skilltree-panel');
+const SKILL_TREE_ORDER = ['s1','s2','s3','s5'];
+
+function learnSkillRank(key){
+  if(!player.classId || player.skillPoints <= 0) return;
+  const reqs = SKILL_TREE_REQS[key];
+  const rank = player.skillRanks[key] || 0;
+  if(rank >= reqs.length) return;
+  const req = reqs[rank];
+  if(player.level < req.level || player.rebirths < req.rebirth) return;
+  player.skillPoints--;
+  player.skillRanks[key] = rank + 1;
+  const cls = getClassDef();
+  spawnToast(`${cls.skills[key].name} 랭크 ${rank+1} 습득!`, '#5cff8a');
+  SFX.levelup();
+  refreshHUD();
+  renderSkillTree();
+  saveGame(true);
+}
+
+function renderSkillTree(){
+  const cls = getClassDef();
+  const rows = document.getElementById('skilltree-rows');
+  if(!cls){ rows.innerHTML = '<div style="color:#888;text-align:center;padding:20px 0;">직업을 선택한 후 이용할 수 있습니다.</div>'; return; }
+  rows.innerHTML = SKILL_TREE_ORDER.map(key=>{
+    const skill = cls.skills[key];
+    if(!skill) return '';
+    const reqs = SKILL_TREE_REQS[key];
+    const rank = player.skillRanks[key] || 0;
+    const maxRank = reqs.length;
+    const maxed = rank >= maxRank;
+    let reqHtml = '';
+    let btnHtml = '';
+    if(maxed){
+      reqHtml = `<div class="skill-row-req">최대 랭크 달성</div>`;
+    } else {
+      const req = reqs[rank];
+      const reqMet = player.level >= req.level && player.rebirths >= req.rebirth;
+      const reqText = `다음 랭크 조건: Lv.${req.level}${req.rebirth>0?` · 환생 ${req.rebirth}회`:''}`;
+      reqHtml = `<div class="skill-row-req ${reqMet?'':'unmet'}">${reqText}</div>`;
+      const canLearn = reqMet && player.skillPoints > 0;
+      btnHtml = `<button class="skill-row-btn" data-key="${key}" ${canLearn?'':'disabled'}>${rank===0?'스킬 배우기':'랭크업'} (포인트 1)</button>`;
+    }
+    return `<div class="skill-row ${maxed?'maxed':''}">`+
+      `<div class="skill-row-top"><span class="skill-row-icon">${skill.icon}</span><span class="skill-row-name">${skill.name}</span><span class="skill-row-rank">${rank}/${maxRank}</span></div>`+
+      `<div class="skill-row-desc">${skill.desc||''}</div>`+
+      reqHtml + btnHtml +
+    `</div>`;
+  }).join('');
+  document.getElementById('skilltree-points-count').textContent = player.skillPoints;
+  rows.querySelectorAll('.skill-row-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> learnSkillRank(btn.dataset.key));
+  });
+}
+
+function toggleSkillTree(){
+  skilltreePanel.classList.toggle('hidden');
+  if(!skilltreePanel.classList.contains('hidden')) renderSkillTree();
+}
+document.getElementById('skilltree-close').addEventListener('click', toggleSkillTree);
+document.getElementById('btn-skilltree').addEventListener('click', toggleSkillTree);
+
 /* ---------------------------- 입력 처리 ---------------------------- */
 
 const raycaster = new THREE.Raycaster();
@@ -2814,6 +2939,7 @@ window.addEventListener('keydown', (e)=>{
   if(matchKey(e,'KeyL','l')) toggleQuestLog();
   if(matchKey(e,'KeyK','k')) toggleCodex();
   if(matchKey(e,'KeyC','c')) toggleStatPanel();
+  if(matchKey(e,'KeyV','v')) toggleSkillTree();
   if(matchKey(e,'KeyR','r')) toggleMount();
 });
 document.getElementById('slot-potion').addEventListener('click', usePotion);
@@ -2824,6 +2950,7 @@ document.getElementById('slot-skill3').addEventListener('click', ()=>useClassSki
 document.getElementById('slot-mount').addEventListener('click', toggleMount);
 document.getElementById('slot-basic').addEventListener('click', useBasicAttackHotkey);
 document.getElementById('slot-skill4').addEventListener('click', useEvilSpirit);
+document.getElementById('slot-skill5').addEventListener('click', ()=>useClassSkill('s5'));
 
 /* ---------------------------- 데미지 / 전투 ---------------------------- */
 
@@ -3035,6 +3162,7 @@ function updatePlayer(dt){
   if(skillState.s2.cd > 0) skillState.s2.cd -= dt;
   if(skillState.s3.cd > 0) skillState.s3.cd -= dt;
   if(skillState.s4.cd > 0) skillState.s4.cd -= dt;
+  if(skillState.s5.cd > 0) skillState.s5.cd -= dt;
   if(basicAttackState.cd > 0) basicAttackState.cd -= dt;
   ['atk','def','dmgReduction','speed'].forEach(k=>{
     if(player.buffTimers[k] > 0){
@@ -3335,6 +3463,13 @@ function refreshHUD(){
   if(player.statPoints > 0){ statBadge.textContent = player.statPoints; statBadge.classList.remove('hidden'); }
   else { statBadge.classList.add('hidden'); }
 
+  const skillBadge = document.getElementById('skill-points-badge');
+  if(skillBadge){
+    if(player.skillPoints > 0){ skillBadge.textContent = player.skillPoints; skillBadge.classList.remove('hidden'); }
+    else { skillBadge.classList.add('hidden'); }
+  }
+  applySkillUI();
+
   updateWeaponVisual();
   saveGame();
 }
@@ -3370,11 +3505,26 @@ function applyClassVisual(){
 function applySkillUI(){
   const cls = getClassDef();
   if(!cls) return;
-  ['s1','s2','s3'].forEach(key=>{
+  ['s1','s2','s3','s5'].forEach(key=>{
     const skill = cls.skills[key];
     const slotEl = document.getElementById('slot-skill'+key.slice(1));
     slotEl.querySelector('.icon').textContent = skill.icon;
-    slotEl.title = skill.name;
+    const rank = player.skillRanks[key] || 0;
+    slotEl.title = rank>0 ? `${skill.name} (랭크 ${rank})` : `${skill.name} (미습득 - V: 스킬트리)`;
+    slotEl.classList.toggle('locked', rank<=0);
+    let lockEl = slotEl.querySelector('.lock-overlay');
+    if(rank<=0){
+      if(!lockEl){ lockEl = document.createElement('div'); lockEl.className='lock-overlay'; lockEl.textContent='🔒'; slotEl.appendChild(lockEl); }
+    } else if(lockEl){
+      lockEl.remove();
+    }
+    let rankEl = slotEl.querySelector('.rank-badge');
+    if(rank>0){
+      if(!rankEl){ rankEl = document.createElement('span'); rankEl.className='rank-badge'; slotEl.appendChild(rankEl); }
+      rankEl.textContent = 'Lv'+rank;
+    } else if(rankEl){
+      rankEl.remove();
+    }
   });
 }
 
@@ -3385,6 +3535,8 @@ function selectClass(classId){
   player.baseDef = cls.base.def; player.baseCrit = cls.base.crit;
   player.hp = cls.base.hp;
   player.baseMp = cls.base.mp; player.mp = cls.base.mp;
+  player.skillRanks = { s1:1, s2:0, s3:0, s5:0 };
+  player.skillPoints = 0;
   applyClassVisual();
   applySkillUI();
   document.getElementById('class-select-screen').classList.add('hidden');
@@ -3440,6 +3592,8 @@ function saveGame(force){
     statPoints: player.statPoints,
     allocatedStats: player.allocatedStats,
     junkThreshold: player.junkThreshold,
+    skillPoints: player.skillPoints,
+    skillRanks: player.skillRanks,
   };
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(data)); }catch(e){ /* 저장 공간 없음: 무시 */ }
 }
@@ -3469,6 +3623,11 @@ function loadGame(){
     player.statPoints = data.statPoints || 0;
     player.allocatedStats = Object.assign({ str:0, agi:0, int:0, vit:0 }, data.allocatedStats || {});
     player.junkThreshold = JUNK_RARITY_OPTIONS.includes(data.junkThreshold) ? data.junkThreshold : 'magic';
+    // 스킬트리 도입 이전 세이브는 s1/s2/s3를 이미 쓰던 것으로 간주해 랭크1로 승계, 신규 필살기(s5)만 새로 습득해야 함
+    player.skillPoints = data.skillPoints || 0;
+    player.skillRanks = data.skillRanks
+      ? Object.assign({ s1:0, s2:0, s3:0, s5:0 }, data.skillRanks)
+      : { s1:1, s2:1, s3:1, s5:0 };
     player.hp = player.baseHp;
     player.mp = player.baseMp;
 
@@ -3627,6 +3786,7 @@ setInterval(()=>{
   updateCdOverlay('slot-skill2', skillState.s2.cd);
   updateCdOverlay('slot-skill3', skillState.s3.cd);
   updateCdOverlay('slot-skill4', skillState.s4.cd);
+  updateCdOverlay('slot-skill5', skillState.s5.cd);
   updateCdOverlay('slot-basic', basicAttackState.cd);
   updateOrbs();
   updateBuffRow();
