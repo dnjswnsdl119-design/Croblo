@@ -2368,17 +2368,36 @@ function updatePet(dt){
 let monsters = [];
 let monsterUid = 1;
 
+// 필드 몬스터 접두사(어픽스): 같은 몬스터라도 아주 낮은 확률로 강화된 개체로 등장한다. 스탯이 크게 오르는 대신 경험치/골드/드랍률도 크게 늘어난다.
+// opts.allowAffix===true 인 자연 필드 스폰(초기 배치/주기 리스폰)에서만 굴리며, 던전 웨이브/보스/위험지역 정예 무리에는 적용하지 않는다.
+const MONSTER_AFFIXES = [
+  { id:'enraged', prefix:'분노한', hpMult:1.3, atkMult:1.6, speedMult:1.15, nameColor:'#ff5c3a', color:0xff5c3a },
+  { id:'giant',   prefix:'거대한', hpMult:2.4, atkMult:1.3, speedMult:0.85, scaleMult:1.35, nameColor:'#c9a0ff', color:0xc9a0ff },
+  { id:'swift',   prefix:'신속한', hpMult:0.9, atkMult:1.15, speedMult:1.7, nameColor:'#4ad0ff', color:0x4ad0ff },
+  { id:'ancient', prefix:'태고의', hpMult:1.6, atkMult:1.4, speedMult:1.0, nameColor:'#ffd84a', color:0xffd84a },
+  { id:'rare',    prefix:'희귀한', hpMult:1.8, atkMult:1.5, speedMult:1.1, nameColor:'#ff6ad0', color:0xff6ad0 },
+];
+const AFFIX_SPAWN_CHANCE = 0.05; // 일반 몹보다 훨씬 낮은 확률로 등장
+const AFFIX_REWARD_MULT = { xp:2.2, gold:2.4, drop:2.6 };
+function rollMonsterAffix(){
+  if(Math.random() >= AFFIX_SPAWN_CHANCE) return null;
+  return choice(MONSTER_AFFIXES);
+}
+
 function spawnMonster(typeKey, x, z, opts){
   opts = opts || {};
   const baseDef = MONSTER_DEFS[typeKey];
-  // opts.hpMult/atkMult 로 웨이브 스케일링된 개별 def 복제 (원본 MONSTER_DEFS는 불변 유지)
-  const def = (opts.hpMult||opts.atkMult) ? {
+  const affix = (opts.allowAffix && !baseDef.isBoss) ? rollMonsterAffix() : null;
+  // opts.hpMult/atkMult/어픽스 로 웨이브 스케일링된 개별 def 복제 (원본 MONSTER_DEFS는 불변 유지)
+  const def = (opts.hpMult||opts.atkMult||affix) ? {
     ...baseDef,
-    hp: Math.round(baseDef.hp*(opts.hpMult||1)),
-    atk: Math.round(baseDef.atk*(opts.atkMult||1)),
+    hp: Math.round(baseDef.hp*(opts.hpMult||1)*(affix?affix.hpMult:1)),
+    atk: Math.round(baseDef.atk*(opts.atkMult||1)*(affix?affix.atkMult:1)),
+    speed: baseDef.speed*(affix?affix.speedMult:1),
+    scale: baseDef.scale*(affix&&affix.scaleMult?affix.scaleMult:1),
   } : baseDef;
 
-  const level = opts.levelOverride || Math.max(1, Math.round(baseDef.level * (opts.hpMult ? Math.sqrt(opts.hpMult) : 1)));
+  const level = opts.levelOverride || Math.max(1, Math.round(baseDef.level * (opts.hpMult ? Math.sqrt(opts.hpMult) : 1) * (affix ? Math.sqrt(affix.hpMult) : 1)));
 
   const g = new THREE.Group();
   const bodyColor = def.color;
@@ -2410,6 +2429,12 @@ function spawnMonster(typeKey, x, z, opts){
     crown.position.y = 1.75*def.scale; crown.rotation.x = Math.PI/2;
     g.add(crown);
   }
+  if(affix){
+    // 어픽스 몬스터 시각 표식: 발밑에 접두사 색상의 오라 링을 둘러 필드에서 멀리서도 눈에 띄게 한다
+    const aura = new THREE.Mesh(new THREE.RingGeometry(0.55*def.scale,0.7*def.scale,20), new THREE.MeshBasicMaterial({color:affix.color, transparent:true, opacity:0.75, side:THREE.DoubleSide}));
+    aura.rotation.x = -Math.PI/2; aura.position.y = 0.08;
+    g.add(aura);
+  }
   g.position.set(x,0,z);
   scene.add(g);
 
@@ -2422,7 +2447,7 @@ function spawnMonster(typeKey, x, z, opts){
   document.getElementById('game-container').appendChild(barWrap);
   const nameTag = document.createElement('div');
   nameTag.style.cssText = 'position:absolute;font-size:10px;color:#fff;text-shadow:0 1px 2px #000;pointer-events:none;white-space:nowrap;transform:translate(-50%,-100%);';
-  nameTag.textContent = (def.isBoss?'★ ':'')+`Lv.${level} `+(opts.nameOverride||def.name);
+  nameTag.textContent = (def.isBoss?'★ ':'')+(affix?affix.prefix+' ':'')+`Lv.${level} `+(opts.nameOverride||def.name);
   document.getElementById('game-container').appendChild(nameTag);
 
   const m = {
@@ -2437,7 +2462,10 @@ function spawnMonster(typeKey, x, z, opts){
     isDungeon: !!opts.isDungeon,
     bossPhase: def.isBoss ? 1 : undefined,
     phaseAtkMult: 1, phaseCdMult: 1,
-    dropMult: opts.dropMult || 1, goldMult: opts.goldMult || 1,
+    affix,
+    dropMult: (opts.dropMult || 1) * (affix ? AFFIX_REWARD_MULT.drop : 1),
+    goldMult: (opts.goldMult || 1) * (affix ? AFFIX_REWARD_MULT.gold : 1),
+    xpMult: affix ? AFFIX_REWARD_MULT.xp : 1,
   };
   monsters.push(m);
   return m;
@@ -2450,7 +2478,7 @@ function initialSpawn(){
     const x = Math.cos(angle)*r, z = Math.sin(angle)*r;
     const roll = Math.random();
     const type = roll<0.12?'archer':roll<0.24?'orc':roll<0.5?'wolf':'goblin';
-    spawnMonster(type, x, z);
+    spawnMonster(type, x, z, { allowAffix:true });
   }
   spawnMonster('chief', -30, -30);
 }
@@ -3171,7 +3199,7 @@ function buildTown2(){
     const x = TOWN2_CENTER.x + Math.cos(angle)*r, z = TOWN2_CENTER.z + Math.sin(angle)*r;
     const roll = Math.random();
     const type = roll<0.35 ? 'drowned' : roll<0.65 ? 'seaghost' : 'orc';
-    spawnMonster(type, x, z);
+    spawnMonster(type, x, z, { allowAffix:true });
   }
 }
 buildTown2();
@@ -3213,7 +3241,7 @@ function buildTown3(){
     const x = TOWN3_CENTER.x + Math.cos(angle)*r, z = TOWN3_CENTER.z + Math.sin(angle)*r;
     const roll = Math.random();
     const type = roll<0.35 ? 'sandwraith' : roll<0.65 ? 'scarab' : 'archer';
-    spawnMonster(type, x, z);
+    spawnMonster(type, x, z, { allowAffix:true });
   }
 }
 buildTown3();
@@ -4841,13 +4869,14 @@ function killMonster(monster){
   if(isChilled(monster)) triggerFrostNova(monster);
   const explosionSpecial = getTotalStats()._setSpecials?.find(sp=>sp.type==='onkill_explosion');
   if(explosionSpecial && Math.random() < explosionSpecial.chance) triggerSetExplosion(monster, explosionSpecial);
+  if(monster.affix) spawnToast(`${monster.affix.prefix} ${monster.def.name} 처치! 추가 보상 획득`, monster.affix.nameColor);
   SFX.monsterDeath();
   const dropX = monster.pos.x, dropZ = monster.pos.z;
   const mLevel = monster.level || 1;
   // 몬스터가 내 레벨보다 높을수록 경험치/골드 보상이 늘고, 훨씬 낮으면 보상이 줄어든다
   const rewardMult = clamp(1 + (mLevel - player.level)*0.12, 0.5, 2.5);
-  addXP(Math.max(1, Math.round(monster.def.xp * rewardMult)));
-  addGrowthWeaponXP(Math.max(1, Math.round(monster.def.xp * 0.7 * rewardMult)));
+  addXP(Math.max(1, Math.round(monster.def.xp * rewardMult * (monster.xpMult||1))));
+  addGrowthWeaponXP(Math.max(1, Math.round(monster.def.xp * 0.7 * rewardMult * (monster.xpMult||1))));
   if(!player.discoveredMonsters.includes(monster.type)) player.discoveredMonsters.push(monster.type);
   const gold = Math.max(1, Math.round(randi(monster.def.goldMin, monster.def.goldMax) * rewardMult * (monster.goldMult||1)));
   spawnGoldPickup(gold, dropX, dropZ);
@@ -5416,7 +5445,7 @@ function updateBars(){
     m.barWrap.style.top = y+'px';
     m.nameTag.style.left = x+'px';
     m.nameTag.style.top = (y-4)+'px';
-    const lvlColor = m.level > player.level ? '#ff5c5c' : (m.def.isBoss ? '#ffd84a' : '#fff');
+    const lvlColor = m.affix ? m.affix.nameColor : (m.level > player.level ? '#ff5c5c' : (m.def.isBoss ? '#ffd84a' : '#fff'));
     if(m.nameTag.style.color !== lvlColor) m.nameTag.style.color = lvlColor;
     if(m.aggroEl){
       m.aggroEl.style.display = visible ? 'block':'none';
@@ -6435,7 +6464,7 @@ setInterval(()=>{
     if(!collides(x,z,1)){
       const roll = Math.random();
       const type = roll<0.12?'archer':roll<0.24?'orc':roll<0.5?'wolf':'goblin';
-      spawnMonster(type, x, z);
+      spawnMonster(type, x, z, { allowAffix:true });
     }
   }
 }, 1800);
