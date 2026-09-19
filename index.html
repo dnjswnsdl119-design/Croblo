@@ -235,6 +235,9 @@
   .skill-row-req.unmet{color:#ff8a8a;}
   .skill-row-btn{width:100%;padding:7px;border-radius:5px;border:1px solid var(--gold);background:rgba(232,198,106,0.12);color:var(--gold);cursor:pointer;font-size:12px;}
   .skill-row-btn:disabled{opacity:0.3;cursor:not-allowed;border-color:#555;color:#888;}
+  .skilltree-branch-row{display:flex;gap:8px;}
+  .skilltree-branch-row .skill-row.branch-item{flex:1;min-width:0;}
+  .skill-row.branch-item{border-left:2px solid #ff8ccf;}
   #stat-points-badge, #skill-points-badge{display:inline-block;min-width:16px;height:16px;padding:0 3px;margin-left:4px;background:#e33;color:#fff;border-radius:8px;font-size:10px;line-height:16px;text-align:center;vertical-align:middle;}
   #stat-points-badge.hidden, #skill-points-badge.hidden{display:none;}
 
@@ -1054,7 +1057,7 @@ const player = {
   allocatedStats:{ str:0, agi:0, int:0, vit:0 },
   junkThreshold:'magic',
   skillPoints:0,
-  skillRanks:{ s1:0, s2:0, s3:0, s5:0, s5b:0 },
+  skillRanks:{ s1:0, s2:0, s2b:0, s3:0, s5:0, s5b:0 },
   currentTown:'town1',
 };
 const JUNK_RARITY_OPTIONS = ['normal','magic','rare','set'];
@@ -1093,10 +1096,11 @@ const CLASS_DEFS = {
     mpRegen:4,
     skills:{
       s1:{ name:'크리티컬 블로', icon:'⚔️', type:'melee_single', mult:2.6, cdMax:4, cost:15, desc:'적 하나에게 강력한 일격을 가한다.' },
-      s2:{ name:'휩쓸기',       icon:'🌀', type:'melee_aoe',    mult:1.25, radius:3.6, cdMax:6, cost:20, desc:'주변의 적들을 검으로 휩쓴다.' },
-      s3:{ name:'브레이브',      icon:'🛡️', type:'buff_def',    bonus:0.4, duration:6, cdMax:14, cost:20, desc:'일정 시간 동안 방어력이 크게 증가한다.' },
-      s5:{ name:'결전의 일격',  icon:'💥', type:'melee_single', mult:4.5, cdMax:12, cost:35, desc:'적 하나에게 막대한 피해를 입히는 필살기.' },
-      s5b:{ name:'불굴의 의지', icon:'🛡️', type:'buff_def', bonus:1.1, duration:8, cdMax:20, cost:40, desc:'일정 시간 동안 방어력이 극적으로 증가하는 궁극의 수호 태세.' },
+      s2:{ name:'휩쓸기',       icon:'🌀', type:'melee_aoe',    mult:1.25, radius:3.6, cdMax:6, cost:20, desc:'주변의 적들을 검으로 휩쓴다. (공격 루트)', prereq:{skill:'s1',rank:2} },
+      s2b:{ name:'수호의 외침', icon:'🔰', type:'buff_def',     bonus:0.35, duration:6, cdMax:11, cost:18, desc:'방패로 땅을 내리쳐 방어력을 높인다. (수호 루트)', prereq:{skill:'s1',rank:2} },
+      s3:{ name:'브레이브',      icon:'🛡️', type:'buff_def',    bonus:0.4, duration:6, cdMax:14, cost:20, desc:'일정 시간 동안 방어력이 크게 증가한다.', prereq:{skill:'s1',rank:1} },
+      s5:{ name:'결전의 일격',  icon:'💥', type:'melee_single', mult:4.5, cdMax:12, cost:35, desc:'적 하나에게 막대한 피해를 입히는 필살기. (공격 루트 궁극기)', prereq:{skill:'s2',rank:1} },
+      s5b:{ name:'불굴의 의지', icon:'🛡️', type:'buff_def', bonus:1.1, duration:8, cdMax:20, cost:40, desc:'일정 시간 동안 방어력이 극적으로 증가하는 궁극의 수호 태세. (수호 루트 궁극기)', prereq:{skill:'s2b',rank:1} },
     },
     skill4:{ name:'검기 파동', icon:'🌊', color:0x5ab0ff, ringColor:0x8ad8ff, dmgColor:'#8ad8ff',
       cdMax:9, cost:28, speed:5.0, radius:1.8, tickInterval:0.35, dmgMult:0.9, lifeDistance:18,
@@ -1110,10 +1114,11 @@ const CLASS_DEFS = {
     mpRegen:4,
     skills:{
       s1:{ name:'분쇄의 일격',   icon:'⚔️', type:'melee_single', mult:2.2, cdMax:4, cost:15, desc:'거대한 무기로 적을 내려찍는다.' },
-      s2:{ name:'스톤스킨',     icon:'🪨', type:'buff_def',     bonus:0.55, duration:6, cdMax:12, cost:20, desc:'피부가 돌처럼 단단해져 방어력이 크게 증가한다.' },
-      s3:{ name:'라이온하트',   icon:'📣', type:'buff_atk_heal', atkBonus:0.28, healPct:0.2, duration:6, cdMax:16, cost:25, desc:'포효하여 공격력을 높이고 체력을 회복한다.' },
-      s5:{ name:'광란의 강타',  icon:'💥', type:'melee_aoe', mult:2.2, radius:4.2, cdMax:14, cost:40, desc:'주변 모든 적을 강타하는 광란의 일격.' },
-      s5b:{ name:'피의 갈증',  icon:'🩸', type:'buff_atk_heal', atkBonus:0.6, healPct:0.45, duration:8, cdMax:20, cost:40, desc:'적의 피를 갈망하며 공격력이 크게 오르고 체력을 대폭 회복한다.' },
+      s2:{ name:'광란의 베기',  icon:'🌀', type:'melee_aoe',    mult:1.3, radius:3.8, cdMax:7, cost:20, desc:'무기를 크게 휘둘러 주변 적을 베어낸다. (공격 루트)', prereq:{skill:'s1',rank:2} },
+      s2b:{ name:'스톤스킨',    icon:'🪨', type:'buff_def',     bonus:0.55, duration:6, cdMax:12, cost:20, desc:'피부가 돌처럼 단단해져 방어력이 크게 증가한다. (수호 루트)', prereq:{skill:'s1',rank:2} },
+      s3:{ name:'라이온하트',   icon:'📣', type:'buff_atk_heal', atkBonus:0.28, healPct:0.2, duration:6, cdMax:16, cost:25, desc:'포효하여 공격력을 높이고 체력을 회복한다.', prereq:{skill:'s1',rank:1} },
+      s5:{ name:'광란의 강타',  icon:'💥', type:'melee_aoe', mult:2.2, radius:4.2, cdMax:14, cost:40, desc:'주변 모든 적을 강타하는 광란의 일격. (공격 루트 궁극기)', prereq:{skill:'s2',rank:1} },
+      s5b:{ name:'피의 갈증',  icon:'🩸', type:'buff_atk_heal', atkBonus:0.6, healPct:0.45, duration:8, cdMax:20, cost:40, desc:'적의 피를 갈망하며 공격력이 크게 오르고 체력을 대폭 회복한다. (수호 루트 궁극기)', prereq:{skill:'s2b',rank:1} },
     },
     skill4:{ name:'포효의 파동', icon:'🔥', color:0xff6a3a, ringColor:0xffab6a, dmgColor:'#ff8a4a',
       cdMax:10, cost:32, speed:3.8, radius:2.1, tickInterval:0.4, dmgMult:1.0, lifeDistance:16,
@@ -1127,10 +1132,11 @@ const CLASS_DEFS = {
     mpRegen:5,
     skills:{
       s1:{ name:'데들리 어썰트', icon:'⚔️', type:'melee_single', mult:3.1, cdMax:5, cost:18, desc:'번개같은 찌르기로 치명적인 피해를 입힌다.' },
-      s2:{ name:'크러싱 폴',    icon:'🌀', type:'melee_aoe',    mult:1.3, radius:3.6, cdMax:6, cost:20, desc:'창을 내리찍어 주변 적들에게 피해를 입힌다.' },
-      s3:{ name:'헤이스트',     icon:'💨', type:'buff_speed',   mult:1.45, duration:5, cdMax:12, cost:20, desc:'이동 속도가 크게 빨라진다.' },
-      s5:{ name:'천공섬',       icon:'💥', type:'melee_single', mult:5.0, cdMax:10, cost:32, desc:'하늘을 가르는 필살의 일격. 극도로 높은 단일 대상 피해.' },
-      s5b:{ name:'질풍노도',   icon:'🌪️', type:'buff_speed', mult:2.0, duration:8, cdMax:18, cost:36, desc:'폭풍처럼 몰아치며 이동 속도가 극적으로 빨라진다.' },
+      s2:{ name:'크러싱 폴',    icon:'🌀', type:'melee_aoe',    mult:1.3, radius:3.6, cdMax:6, cost:20, desc:'창을 내리찍어 주변 적들에게 피해를 입힌다. (공격 루트)', prereq:{skill:'s1',rank:2} },
+      s2b:{ name:'회피의 춤',   icon:'💨', type:'buff_speed',   mult:1.3, duration:5, cdMax:10, cost:16, desc:'유려한 몸놀림으로 이동 속도가 빨라진다. (기동 루트)', prereq:{skill:'s1',rank:2} },
+      s3:{ name:'헤이스트',     icon:'💨', type:'buff_speed',   mult:1.45, duration:5, cdMax:12, cost:20, desc:'이동 속도가 크게 빨라진다.', prereq:{skill:'s1',rank:1} },
+      s5:{ name:'천공섬',       icon:'💥', type:'melee_single', mult:5.0, cdMax:10, cost:32, desc:'하늘을 가르는 필살의 일격. 극도로 높은 단일 대상 피해. (공격 루트 궁극기)', prereq:{skill:'s2',rank:1} },
+      s5b:{ name:'질풍노도',   icon:'🌪️', type:'buff_speed', mult:2.0, duration:8, cdMax:18, cost:36, desc:'폭풍처럼 몰아치며 이동 속도가 극적으로 빨라진다. (기동 루트 궁극기)', prereq:{skill:'s2b',rank:1} },
     },
     skill4:{ name:'질풍의 창격', icon:'✨', color:0xffe066, ringColor:0xfff3b0, dmgColor:'#ffe066',
       cdMax:8, cost:26, speed:6.0, radius:1.6, tickInterval:0.3, dmgMult:0.8, lifeDistance:20,
@@ -1144,10 +1150,11 @@ const CLASS_DEFS = {
     mpRegen:8,
     skills:{
       s1:{ name:'매직 미사일',   icon:'⚔️', type:'ranged_single', mult:2.3, cdMax:2.6, cost:12, desc:'마력탄을 발사해 원거리 피해를 입힌다.' },
-      s2:{ name:'아스트랄 스톰', icon:'🌀', type:'ranged_aoe',    mult:1.4, radius:3.6, cdMax:7, cost:22, desc:'원소의 폭풍을 일으켜 넓은 범위에 피해를 입힌다.' },
-      s3:{ name:'매직실드',     icon:'🔰', type:'buff_shield',   reduction:0.4, duration:5, cdMax:14, cost:20, desc:'마법 보호막을 둘러 받는 피해를 줄인다.' },
-      s5:{ name:'메테오 스트라이크', icon:'💥', type:'ranged_aoe', mult:2.6, radius:4.5, cdMax:13, cost:45, desc:'하늘에서 유성을 떨어뜨려 넓은 범위에 큰 피해를 입힌다.' },
-      s5b:{ name:'빙결의 지배자', icon:'❄️', type:'buff_shield', reduction:0.75, duration:8, cdMax:20, cost:42, desc:'얼음 보호막을 둘러 받는 피해를 극적으로 줄이는 궁극의 방어 마법.' },
+      s2:{ name:'아스트랄 스톰', icon:'🌀', type:'ranged_aoe',    mult:1.4, radius:3.6, cdMax:7, cost:22, desc:'원소의 폭풍을 일으켜 넓은 범위에 피해를 입힌다. (공격 루트)', prereq:{skill:'s1',rank:2} },
+      s2b:{ name:'가속 시전',   icon:'🌪️', type:'buff_speed',   mult:1.25, duration:5, cdMax:10, cost:18, desc:'마력으로 몸을 가볍게 하여 이동 속도를 높인다. (원소 제어 루트)', prereq:{skill:'s1',rank:2} },
+      s3:{ name:'매직실드',     icon:'🔰', type:'buff_shield',   reduction:0.4, duration:5, cdMax:14, cost:20, desc:'마법 보호막을 둘러 받는 피해를 줄인다.', prereq:{skill:'s1',rank:1} },
+      s5:{ name:'메테오 스트라이크', icon:'💥', type:'ranged_aoe', mult:2.6, radius:4.5, cdMax:13, cost:45, desc:'하늘에서 유성을 떨어뜨려 넓은 범위에 큰 피해를 입힌다. (공격 루트 궁극기)', prereq:{skill:'s2',rank:1} },
+      s5b:{ name:'빙결의 지배자', icon:'❄️', type:'buff_shield', reduction:0.75, duration:8, cdMax:20, cost:42, desc:'얼음 보호막을 둘러 받는 피해를 극적으로 줄이는 궁극의 방어 마법. (원소 제어 루트 궁극기)', prereq:{skill:'s2b',rank:1} },
     },
     skill4:{ name:'악령 소환', icon:'👻', color:0x6a2a9a, ringColor:0xaa66ff, dmgColor:'#aa66ff',
       cdMax:9, cost:30, speed:4.5, radius:1.8, tickInterval:0.35, dmgMult:0.85, lifeDistance:18,
@@ -1160,12 +1167,14 @@ function getClassDef(){ return player.classId ? CLASS_DEFS[player.classId] : nul
 const SKILL_TREE_REQS = {
   s1: [ {level:1, rebirth:0}, {level:5, rebirth:0}, {level:12, rebirth:1} ],
   s2: [ {level:5, rebirth:0}, {level:10, rebirth:0}, {level:16, rebirth:1} ],
+  s2b: [ {level:5, rebirth:0}, {level:10, rebirth:0}, {level:16, rebirth:1} ],
   s3: [ {level:10, rebirth:0}, {level:14, rebirth:1}, {level:20, rebirth:2} ],
   s5: [ {level:15, rebirth:1} ],
   s5b: [ {level:15, rebirth:1} ],
 };
-// 서로 배타적인 궁극기 묶음: 한쪽을 배우면 다른 쪽은 초기화 전까지 배울 수 없다 (플레이어별 스킬 루트 분기)
-const EXCLUSIVE_SKILL_GROUPS = [ ['s5','s5b'] ];
+// 서로 배타적인 분기 묶음: 한쪽을 배우면 다른 쪽은 초기화 전까지 배울 수 없다 (플레이어별 스킬 루트 분기)
+// s2/s2b = 2단계 전투 스타일 분기(공격 vs 수호·기동), s5/s5b = 4단계 궁극기 분기(각각 s2/s2b 계열을 선행해야 함)
+const EXCLUSIVE_SKILL_GROUPS = [ ['s2','s2b'], ['s5','s5b'] ];
 function getExclusiveGroupOf(key){
   return EXCLUSIVE_SKILL_GROUPS.find(g=>g.includes(key));
 }
@@ -1676,12 +1685,19 @@ function getKeyboardMoveDir(){
 const skillState = {
   s1: { cd:0 },
   s2: { cd:0 },
+  s2b: { cd:0 },
   s3: { cd:0 },
   s4: { cd:0 },
   s5: { cd:0 },
   s5b: { cd:0 },
 };
 
+// 슬롯2는 s2/s2b 중 플레이어가 선택(습득)한 2단계 전투 스타일을 표시한다
+function getActiveSlot2Key(){
+  if(player.skillRanks.s2 > 0) return 's2';
+  if(player.skillRanks.s2b > 0) return 's2b';
+  return 's2';
+}
 // 슬롯5는 s5/s5b 중 플레이어가 선택(습득)한 궁극기를 표시한다
 function getActiveUltimateKey(){
   if(player.skillRanks.s5 > 0) return 's5';
@@ -1907,7 +1923,7 @@ function updateEvilSpirits(dt){
 
 window.addEventListener('keydown', (e)=>{
   if(matchKey(e,'Digit1','1')) useClassSkill('s1');
-  if(matchKey(e,'Digit2','2')) useClassSkill('s2');
+  if(matchKey(e,'Digit2','2')) useClassSkill(getActiveSlot2Key());
   if(matchKey(e,'Digit3','3')) useClassSkill('s3');
   if(matchKey(e,'Digit4','4')) useEvilSpirit();
   if(matchKey(e,'Digit5','5')) useClassSkill(getActiveUltimateKey());
@@ -3539,7 +3555,16 @@ document.getElementById('btn-statpanel').addEventListener('click', toggleStatPan
 /* ---------------------------- 스킬트리 ---------------------------- */
 
 const skilltreePanel = document.getElementById('skilltree-panel');
-const SKILL_TREE_ORDER = ['s1','s2','s3','s5','s5b'];
+// 스킬트리 구조: 4단계 트리. ②③단계는 서로 다른 루트로 갈라져 클래스마다 다른 스킬 구성이 가능하다.
+//   ① 기본기(s1) -> ② 전투 스타일 분기(s2 공격 vs s2b 수호·기동, 택1) -> ③ 지원기(s3, 루트 무관 자유 습득)
+//                -> ④ 궁극기(s5는 s2 선행 필요, s5b는 s2b 선행 필요, 택1)
+const SKILL_TREE_TIERS = [
+  { title:'① 기본기', keys:['s1'] },
+  { title:'② 전투 스타일 분기 (택1 · 반대 루트는 초기화 전까지 잠김)', keys:['s2','s2b'], branch:true },
+  { title:'③ 지원기 (루트 무관 · 기본기만 있으면 습득 가능)', keys:['s3'] },
+  { title:'④ 궁극기 선택 (택1 · ②단계에서 고른 루트의 궁극기만 배울 수 있음)', keys:['s5','s5b'], branch:true },
+];
+const SKILL_TREE_ORDER = SKILL_TREE_TIERS.flatMap(t=>t.keys);
 
 function learnSkillRank(key){
   if(!player.classId || player.skillPoints <= 0) return;
@@ -3548,19 +3573,29 @@ function learnSkillRank(key){
   if(rank >= reqs.length) return;
   const req = reqs[rank];
   if(player.level < req.level || player.rebirths < req.rebirth) return;
-  // 배타 그룹(예: 궁극기 s5/s5b) 중 하나를 이미 배웠다면 다른 하나는 초기화 전까지 배울 수 없음
+  const cls = getClassDef();
+  const skill = cls.skills[key];
+  // 선행 스킬 조건: 첫 랭크를 배울 때만 검사 (예: s2/s2b는 s1 랭크2, s5/s5b는 각자의 ②단계 스킬 랭크1 필요)
+  if(rank===0 && skill.prereq){
+    const preRank = player.skillRanks[skill.prereq.skill] || 0;
+    if(preRank < skill.prereq.rank){
+      const preSkill = cls.skills[skill.prereq.skill];
+      spawnToast(`선행 스킬이 필요합니다: ${preSkill.name} 랭크 ${skill.prereq.rank}`, '#888');
+      return;
+    }
+  }
+  // 배타 그룹(전투 스타일 분기, 궁극기 분기) 중 하나를 이미 배웠다면 다른 하나는 초기화 전까지 배울 수 없음
   const group = getExclusiveGroupOf(key);
   if(group && rank===0){
     const other = group.find(k=>k!==key);
     if(player.skillRanks[other] > 0){
-      spawnToast('이미 다른 궁극기를 선택했습니다. 초기화 후 다시 선택하세요', '#888');
+      spawnToast('이미 다른 루트의 스킬을 선택했습니다. 초기화 후 다시 선택하세요', '#888');
       return;
     }
   }
   player.skillPoints--;
   player.skillRanks[key] = rank + 1;
-  const cls = getClassDef();
-  spawnToast(`${cls.skills[key].name} 랭크 ${rank+1} 습득!`, '#5cff8a');
+  spawnToast(`${skill.name} 랭크 ${rank+1} 습득!`, '#5cff8a');
   SFX.levelup();
   refreshHUD();
   renderSkillTree();
@@ -3594,40 +3629,52 @@ function renderSkillTree(){
   const rows = document.getElementById('skilltree-rows');
   if(!cls){ rows.innerHTML = '<div style="color:#888;text-align:center;padding:20px 0;">직업을 선택한 후 이용할 수 있습니다.</div>'; return; }
   let html = '';
-  let ultimateHeaderShown = false;
-  SKILL_TREE_ORDER.forEach(key=>{
-    const skill = cls.skills[key];
-    if(!skill) return;
-    const group = getExclusiveGroupOf(key);
-    if(group && !ultimateHeaderShown){
-      html += '<div class="combine-section-title">③ 궁극기 선택 (택1 · 한쪽을 배우면 다른 쪽은 초기화 전까지 잠김)</div>';
-      ultimateHeaderShown = true;
-    }
-    const reqs = SKILL_TREE_REQS[key];
-    const rank = player.skillRanks[key] || 0;
-    const maxRank = reqs.length;
-    const maxed = rank >= maxRank;
-    const lockedByOther = group && rank===0 && player.skillRanks[group.find(k=>k!==key)] > 0;
-    let reqHtml = '';
-    let btnHtml = '';
-    if(lockedByOther){
-      reqHtml = `<div class="skill-row-req unmet">다른 궁극기를 선택함 (초기화 후 선택 가능)</div>`;
-      btnHtml = `<button class="skill-row-btn" disabled>선택 불가</button>`;
-    } else if(maxed){
-      reqHtml = `<div class="skill-row-req">최대 랭크 달성</div>`;
-    } else {
-      const req = reqs[rank];
-      const reqMet = player.level >= req.level && player.rebirths >= req.rebirth;
-      const reqText = `다음 랭크 조건: Lv.${req.level}${req.rebirth>0?` · 환생 ${req.rebirth}회`:''}`;
-      reqHtml = `<div class="skill-row-req ${reqMet?'':'unmet'}">${reqText}</div>`;
-      const canLearn = reqMet && player.skillPoints > 0;
-      btnHtml = `<button class="skill-row-btn" data-key="${key}" ${canLearn?'':'disabled'}>${rank===0?'스킬 배우기':'랭크업'} (포인트 1)</button>`;
-    }
-    html += `<div class="skill-row ${maxed?'maxed':''}">`+
-      `<div class="skill-row-top"><span class="skill-row-icon">${skill.icon}</span><span class="skill-row-name">${skill.name}</span><span class="skill-row-rank">${rank}/${maxRank}</span></div>`+
-      `<div class="skill-row-desc">${skill.desc||''}</div>`+
-      reqHtml + btnHtml +
-    `</div>`;
+  SKILL_TREE_TIERS.forEach(tier=>{
+    const keysInClass = tier.keys.filter(k=>cls.skills[k]);
+    if(!keysInClass.length) return;
+    html += `<div class="combine-section-title">${tier.title}</div>`;
+    if(tier.branch) html += `<div class="skilltree-branch-row">`;
+    keysInClass.forEach(key=>{
+      const skill = cls.skills[key];
+      const reqs = SKILL_TREE_REQS[key];
+      const rank = player.skillRanks[key] || 0;
+      const maxRank = reqs.length;
+      const maxed = rank >= maxRank;
+      const group = getExclusiveGroupOf(key);
+      const lockedByOther = group && rank===0 && player.skillRanks[group.find(k=>k!==key)] > 0;
+      // 선행 스킬 표시 (1랭크를 아직 배우지 않았을 때만 의미가 있음)
+      let prereqMet = true, prereqText = '';
+      if(rank===0 && skill.prereq){
+        const preSkill = cls.skills[skill.prereq.skill];
+        const preRank = player.skillRanks[skill.prereq.skill] || 0;
+        prereqMet = preRank >= skill.prereq.rank;
+        prereqText = `선행: ${preSkill.icon} ${preSkill.name} 랭크${skill.prereq.rank}`;
+      }
+      let reqHtml = '';
+      let btnHtml = '';
+      if(lockedByOther){
+        reqHtml = `<div class="skill-row-req unmet">다른 루트를 선택함 (초기화 후 선택 가능)</div>`;
+        btnHtml = `<button class="skill-row-btn" disabled>선택 불가</button>`;
+      } else if(maxed){
+        reqHtml = `<div class="skill-row-req">최대 랭크 달성</div>`;
+      } else if(!prereqMet){
+        reqHtml = `<div class="skill-row-req unmet">🔒 ${prereqText}</div>`;
+        btnHtml = `<button class="skill-row-btn" disabled>선행 스킬 필요</button>`;
+      } else {
+        const req = reqs[rank];
+        const reqMet = player.level >= req.level && player.rebirths >= req.rebirth;
+        const reqText = (prereqText?`${prereqText} · `:'')+`Lv.${req.level}${req.rebirth>0?` · 환생 ${req.rebirth}회`:''}`;
+        reqHtml = `<div class="skill-row-req ${reqMet?'':'unmet'}">${reqText}</div>`;
+        const canLearn = reqMet && player.skillPoints > 0;
+        btnHtml = `<button class="skill-row-btn" data-key="${key}" ${canLearn?'':'disabled'}>${rank===0?'스킬 배우기':'랭크업'} (포인트 1)</button>`;
+      }
+      html += `<div class="skill-row ${maxed?'maxed':''} ${tier.branch?'branch-item':''}">`+
+        `<div class="skill-row-top"><span class="skill-row-icon">${skill.icon}</span><span class="skill-row-name">${skill.name}</span><span class="skill-row-rank">${rank}/${maxRank}</span></div>`+
+        `<div class="skill-row-desc">${skill.desc||''}</div>`+
+        reqHtml + btnHtml +
+      `</div>`;
+    });
+    if(tier.branch) html += `</div>`;
   });
   const respecCost = 50 * player.level;
   html += `<button class="skill-row-btn" id="skilltree-respec-btn" style="border-color:#ff8a8a;color:#ff8a8a;">스킬트리 초기화 (${respecCost}G)</button>`;
@@ -4109,7 +4156,7 @@ window.addEventListener('keydown', (e)=>{
 document.getElementById('slot-potion').addEventListener('click', usePotion);
 document.getElementById('slot-dodge').addEventListener('click', tryDodge);
 document.getElementById('slot-skill1').addEventListener('click', ()=>useClassSkill('s1'));
-document.getElementById('slot-skill2').addEventListener('click', ()=>useClassSkill('s2'));
+document.getElementById('slot-skill2').addEventListener('click', ()=>useClassSkill(getActiveSlot2Key()));
 document.getElementById('slot-skill3').addEventListener('click', ()=>useClassSkill('s3'));
 document.getElementById('slot-mount').addEventListener('click', toggleMount);
 document.getElementById('slot-basic').addEventListener('click', useBasicAttackHotkey);
@@ -4336,6 +4383,7 @@ function updatePlayer(dt){
   if(playerState.dodgeCooldown > 0) playerState.dodgeCooldown -= dt;
   if(skillState.s1.cd > 0) skillState.s1.cd -= dt;
   if(skillState.s2.cd > 0) skillState.s2.cd -= dt;
+  if(skillState.s2b.cd > 0) skillState.s2b.cd -= dt;
   if(skillState.s3.cd > 0) skillState.s3.cd -= dt;
   if(skillState.s4.cd > 0) skillState.s4.cd -= dt;
   if(skillState.s5.cd > 0) skillState.s5.cd -= dt;
@@ -4685,7 +4733,8 @@ function applySkillUI(){
   const cls = getClassDef();
   if(!cls) return;
   const ultimateKey = getActiveUltimateKey();
-  [['s1','slot-skill1'],['s2','slot-skill2'],['s3','slot-skill3'],[ultimateKey,'slot-skill5']].forEach(([key,slotId])=>{
+  const slot2Key = getActiveSlot2Key();
+  [['s1','slot-skill1'],[slot2Key,'slot-skill2'],['s3','slot-skill3'],[ultimateKey,'slot-skill5']].forEach(([key,slotId])=>{
     const skill = cls.skills[key];
     const slotEl = document.getElementById(slotId);
     slotEl.querySelector('.icon').textContent = skill.icon;
@@ -4719,7 +4768,7 @@ function selectClass(classId){
   player.baseDef = cls.base.def; player.baseCrit = cls.base.crit;
   player.hp = cls.base.hp;
   player.baseMp = cls.base.mp; player.mp = cls.base.mp;
-  player.skillRanks = { s1:1, s2:0, s3:0, s5:0, s5b:0 };
+  player.skillRanks = { s1:1, s2:0, s2b:0, s3:0, s5:0, s5b:0 };
   player.skillPoints = 0;
   applyClassVisual();
   applySkillUI();
@@ -4811,8 +4860,8 @@ function loadGame(){
     // 스킬트리 도입 이전 세이브는 s1/s2/s3를 이미 쓰던 것으로 간주해 랭크1로 승계, 신규 필살기(s5)만 새로 습득해야 함
     player.skillPoints = data.skillPoints || 0;
     player.skillRanks = data.skillRanks
-      ? Object.assign({ s1:0, s2:0, s3:0, s5:0, s5b:0 }, data.skillRanks)
-      : { s1:1, s2:1, s3:1, s5:0, s5b:0 };
+      ? Object.assign({ s1:0, s2:0, s2b:0, s3:0, s5:0, s5b:0 }, data.skillRanks)
+      : { s1:1, s2:1, s2b:0, s3:1, s5:0, s5b:0 };
     player.currentTown = TOWNS[data.currentTown] ? data.currentTown : 'town1';
     player.hp = player.baseHp;
     player.mp = player.baseMp;
@@ -4975,7 +5024,7 @@ function updateMinimap(){
 setInterval(()=>{
   updateCdOverlay('slot-dodge', playerState.dodgeCooldown);
   updateCdOverlay('slot-skill1', skillState.s1.cd);
-  updateCdOverlay('slot-skill2', skillState.s2.cd);
+  updateCdOverlay('slot-skill2', skillState[getActiveSlot2Key()].cd);
   updateCdOverlay('slot-skill3', skillState.s3.cd);
   updateCdOverlay('slot-skill4', skillState.s4.cd);
   updateCdOverlay('slot-skill5', skillState[getActiveUltimateKey()].cd);
