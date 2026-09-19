@@ -251,9 +251,12 @@
   .combine-row-btn{padding:7px 12px;border-radius:5px;border:1px solid #ff8ccf;background:rgba(255,140,207,0.12);color:#ff8ccf;cursor:pointer;font-size:11px;white-space:nowrap;}
   .combine-row-btn:disabled{opacity:0.3;cursor:not-allowed;border-color:#555;color:#888;}
   .combine-empty{color:#888;text-align:center;padding:20px 0;font-size:12px;}
-  #combine-fusion-pickers{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
-  #combine-fusion-pickers select{padding:7px;border-radius:5px;border:1px solid var(--panel-border);background:#1a1712;color:#eee;font-size:12px;}
+  #combine-fusion-pickers, #adv-fusion-pickers{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+  #combine-fusion-pickers select, #adv-fusion-pickers select{padding:7px;border-radius:5px;border:1px solid var(--panel-border);background:#1a1712;color:#eee;font-size:12px;}
   #combine-fusion-preview{font-size:11px;color:#bde0bd;margin-bottom:10px;min-height:16px;}
+  .combine-preview{font-size:11px;color:#bde0bd;margin-bottom:10px;min-height:16px;}
+  .combine-section-title{font-size:11px;color:#ff8ccf;font-weight:bold;margin:14px 0 8px;padding-top:10px;border-top:1px solid var(--panel-border);}
+  .combine-section-title:first-child{margin-top:0;padding-top:0;border-top:none;}
 
   /* ---------- 저장 초기화 버튼 ---------- */
   #btn-reset-save{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(20,16,10,0.85);border:1px solid var(--panel-border);color:#999;cursor:pointer;font-size:15px;z-index:60;}
@@ -796,7 +799,7 @@ function weightedRarity(){
 let itemUid = 1;
 let gameLoaded = false; // loadGame()이 끝나기 전까지 저장을 막아 세이브 파일이 덮어써지는 것을 방지
 
-const SOCKET_COUNT_BY_RARITY = { normal:0, magic:0, rare:1, set:1, unique:2 };
+const SOCKET_COUNT_BY_RARITY = { normal:0, magic:1, rare:2, set:4, unique:6 };
 
 function createRandomItem(){
   const rarityKey = weightedRarity();
@@ -3020,6 +3023,85 @@ function combineRunes(runeId){
   renderInventory(); renderCombinePanel(); refreshHUD(); saveGame(true);
 }
 
+// 이종 보석 혼합: 서로 다른 보석 2개 → 두 스탯을 함께 지닌 혼합석(60% 효율)
+function computeMixedGemStats(gemA, gemB){
+  const ga = GEMS[gemA.gemId], gb = GEMS[gemB.gemId];
+  const stats = { atk:0, def:0, hp:0, crit:0 };
+  stats[ga.stat] += gemStatValue(gemA.gemId, gemA.tier) * 0.6;
+  stats[gb.stat] += gemStatValue(gemB.gemId, gemB.tier) * 0.6;
+  stats.atk = Math.round(stats.atk); stats.def = Math.round(stats.def); stats.hp = Math.round(stats.hp);
+  stats.crit = Math.round(stats.crit*10)/10;
+  return stats;
+}
+function createMixedGemItem(gemA, gemB){
+  const stats = computeMixedGemStats(gemA, gemB);
+  const name = `${GEMS[gemA.gemId].name}-${GEMS[gemB.gemId].name} 혼합석`;
+  return { uid:itemUid++, name, slot:'fusion', rarity:'fusion', fusionStats:stats, base:{}, enhance:0,
+    flavor:'서로 다른 두 보석의 기운이 뒤섞여 하나가 되었다.' };
+}
+function combineMixedGem(uidA, uidB){
+  if(uidA === uidB) return;
+  const gemA = player.inventory.find(i=>i.uid===uidA && i.slot==='gem');
+  const gemB = player.inventory.find(i=>i.uid===uidB && i.slot==='gem');
+  if(!gemA || !gemB || gemA.gemId===gemB.gemId) return;
+  player.inventory = player.inventory.filter(i=>i.uid!==gemA.uid && i.uid!==gemB.uid);
+  const item = createMixedGemItem(gemA, gemB);
+  player.inventory.push(item);
+  spawnToast(`${item.name} 조합 성공!`, '#ff8ccf');
+  SFX.enhanceSuccess();
+  renderInventory(); renderCombinePanel(); refreshHUD(); saveGame(true);
+}
+
+// 룬 역합성: 룬 1개 → 하위 단계 룬 2개로 분해 (조합의 역방향, 유연성 확보용)
+function splitRune(runeId){
+  const idx = RUNE_ORDER.indexOf(runeId);
+  if(idx <= 0) return;
+  const item = player.inventory.find(i=>i.slot==='rune' && i.runeId===runeId);
+  if(!item) return;
+  player.inventory = player.inventory.filter(i=>i.uid!==item.uid);
+  const lowerId = RUNE_ORDER[idx-1];
+  player.inventory.push(createRuneItem(lowerId));
+  player.inventory.push(createRuneItem(lowerId));
+  spawnToast(`${RUNES[runeId].name} 1개 → ${RUNES[lowerId].name} 2개로 분해!`, '#c77dff');
+  SFX.enhanceSuccess();
+  renderInventory(); renderCombinePanel(); refreshHUD(); saveGame(true);
+}
+
+// 상급 융합: 보석 2개 + 룬 1개 → 더 강력한 각인석
+function computeAdvancedFusionStats(gemA, gemB, runeItem){
+  const rs = RUNES[runeItem.runeId].stats;
+  const stats = { atk:rs.atk||0, def:rs.def||0, hp:rs.hp||0, crit:rs.crit||0 };
+  stats[GEMS[gemA.gemId].stat] += gemStatValue(gemA.gemId, gemA.tier);
+  stats[GEMS[gemB.gemId].stat] += gemStatValue(gemB.gemId, gemB.tier);
+  stats.atk = Math.round(stats.atk); stats.def = Math.round(stats.def); stats.hp = Math.round(stats.hp);
+  stats.crit = Math.round(stats.crit*10)/10;
+  return stats;
+}
+function createAdvancedFusionItem(gemA, gemB, runeItem){
+  const stats = computeAdvancedFusionStats(gemA, gemB, runeItem);
+  const name = `상급 각인석 (${GEMS[gemA.gemId].name}·${GEMS[gemB.gemId].name}·${RUNES[runeItem.runeId].name.replace(' 룬','')})`;
+  return { uid:itemUid++, name, slot:'fusion', rarity:'fusion', fusionStats:stats, base:{}, enhance:0,
+    flavor:'두 보석과 룬의 힘이 응축된 강력한 각인석.' };
+}
+function doAdvancedFusion(){
+  const gemASel = document.getElementById('adv-gem-a-select');
+  const gemBSel = document.getElementById('adv-gem-b-select');
+  const runeSel = document.getElementById('adv-rune-select');
+  if(!gemASel || !gemBSel || !runeSel) return;
+  const uidA = Number(gemASel.value), uidB = Number(gemBSel.value), runeUid = Number(runeSel.value);
+  if(uidA === uidB){ spawnToast('서로 다른 보석 2개를 선택하세요', '#888'); return; }
+  const gemA = player.inventory.find(i=>i.uid===uidA && i.slot==='gem');
+  const gemB = player.inventory.find(i=>i.uid===uidB && i.slot==='gem');
+  const runeItem = player.inventory.find(i=>i.uid===runeUid && i.slot==='rune');
+  if(!gemA || !gemB || !runeItem) return;
+  player.inventory = player.inventory.filter(i=>i.uid!==gemA.uid && i.uid!==gemB.uid && i.uid!==runeItem.uid);
+  const item = createAdvancedFusionItem(gemA, gemB, runeItem);
+  player.inventory.push(item);
+  spawnToast(`${item.name} 융합 성공!`, '#ffb347');
+  SFX.enhanceSuccess();
+  renderInventory(); renderCombinePanel(); refreshHUD(); saveGame(true);
+}
+
 function doFusion(){
   const gemSel = document.getElementById('fusion-gem-select');
   const runeSel = document.getElementById('fusion-rune-select');
@@ -3038,54 +3120,127 @@ function doFusion(){
 
 function renderCombineGemTab(){
   const body = document.getElementById('combine-body');
+  const gemItems = player.inventory.filter(i=>i.slot==='gem');
   const groups = {};
-  player.inventory.filter(i=>i.slot==='gem').forEach(i=>{
+  gemItems.forEach(i=>{
     const key = i.gemId+'|'+i.tier;
     groups[key] = (groups[key]||0)+1;
   });
-  const rows = [];
+  const upgradeRows = [];
   Object.keys(GEMS).forEach(gemId=>{
     GEM_TIERS.slice(0,-1).forEach(tier=>{
       const count = groups[gemId+'|'+tier]||0;
-      if(count>0) rows.push({ gemId, tier, count });
+      if(count>0) upgradeRows.push({ gemId, tier, count });
     });
   });
-  if(rows.length===0){ body.innerHTML = '<div class="combine-empty">보유한 보석이 없습니다. 몬스터를 처치해 보석을 획득하세요.</div>'; return; }
-  body.innerHTML = rows.map(r=>{
-    const g = GEMS[r.gemId];
-    const nextTier = GEM_TIERS[GEM_TIERS.indexOf(r.tier)+1];
-    return `<div class="combine-row">
-      <div class="combine-row-info">
-        <div class="combine-row-name" style="color:${g.color};">${GEM_TIER_LABELS[r.tier]} ${g.name} x${r.count}</div>
-        <div class="combine-row-desc">3개 → ${GEM_TIER_LABELS[nextTier]} ${g.name} 1개</div>
-      </div>
-      <button class="combine-row-btn" data-gem="${r.gemId}" data-tier="${r.tier}" ${r.count>=3?'':'disabled'}>조합하기</button>
-    </div>`;
-  }).join('');
-  body.querySelectorAll('.combine-row-btn').forEach(btn=>{
+
+  let html = '<div class="combine-section-title">① 동일 보석 승급 (3개 → 상위 등급 1개)</div>';
+  if(upgradeRows.length===0){
+    html += '<div class="combine-empty">보유한 보석이 없습니다. 몬스터를 처치해 보석을 획득하세요.</div>';
+  } else {
+    html += upgradeRows.map(r=>{
+      const g = GEMS[r.gemId];
+      const nextTier = GEM_TIERS[GEM_TIERS.indexOf(r.tier)+1];
+      return `<div class="combine-row">
+        <div class="combine-row-info">
+          <div class="combine-row-name" style="color:${g.color};">${GEM_TIER_LABELS[r.tier]} ${g.name} x${r.count}</div>
+          <div class="combine-row-desc">3개 → ${GEM_TIER_LABELS[nextTier]} ${g.name} 1개</div>
+        </div>
+        <button class="combine-row-btn" data-gem="${r.gemId}" data-tier="${r.tier}" ${r.count>=3?'':'disabled'}>조합하기</button>
+      </div>`;
+    }).join('');
+  }
+
+  html += '<div class="combine-section-title">② 이종 보석 혼합 (서로 다른 보석 2개 → 두 능력치를 함께 지닌 혼합석)</div>';
+  if(gemItems.length < 2){
+    html += '<div class="combine-empty">보석이 2개 이상 필요합니다.</div>';
+  } else {
+    html += `<div id="combine-fusion-pickers">
+      <select id="mix-gem-a-select">${gemItems.map(g=>`<option value="${g.uid}">${g.name}</option>`).join('')}</select>
+      <select id="mix-gem-b-select">${gemItems.map(g=>`<option value="${g.uid}">${g.name}</option>`).join('')}</select>
+    </div>
+    <div id="mix-gem-preview" class="combine-preview"></div>
+    <button class="combine-row-btn" id="mix-gem-btn" style="width:100%;">혼합하기 (서로 다른 종류의 보석 2개 소모)</button>`;
+  }
+
+  body.innerHTML = html;
+  body.querySelectorAll('.combine-row-btn[data-gem]').forEach(btn=>{
     btn.addEventListener('click', ()=> combineGems(btn.dataset.gem, btn.dataset.tier));
   });
+  if(gemItems.length >= 2){
+    const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
+    const updateMixPreview = ()=>{
+      const uidA = Number(document.getElementById('mix-gem-a-select').value);
+      const uidB = Number(document.getElementById('mix-gem-b-select').value);
+      const gemA = gemItems.find(g=>g.uid===uidA), gemB = gemItems.find(g=>g.uid===uidB);
+      const previewEl = document.getElementById('mix-gem-preview');
+      const btn = document.getElementById('mix-gem-btn');
+      if(!gemA || !gemB || gemA.gemId===gemB.gemId){
+        previewEl.textContent = gemA && gemB && gemA.gemId===gemB.gemId ? '서로 다른 종류의 보석을 선택하세요' : '';
+        btn.disabled = true;
+        return;
+      }
+      btn.disabled = false;
+      const stats = computeMixedGemStats(gemA, gemB);
+      const text = Object.entries(stats).filter(([,v])=>v).map(([k,v])=>`${labels[k]} +${v}${k==='crit'?'%':''}`).join(', ');
+      previewEl.textContent = '결과 능력치: ' + text;
+    };
+    document.getElementById('mix-gem-a-select').addEventListener('change', updateMixPreview);
+    document.getElementById('mix-gem-b-select').addEventListener('change', updateMixPreview);
+    document.getElementById('mix-gem-btn').addEventListener('click', ()=>{
+      combineMixedGem(Number(document.getElementById('mix-gem-a-select').value), Number(document.getElementById('mix-gem-b-select').value));
+    });
+    updateMixPreview();
+  }
 }
 
 function renderCombineRuneTab(){
   const body = document.getElementById('combine-body');
   const groups = {};
   player.inventory.filter(i=>i.slot==='rune').forEach(i=>{ groups[i.runeId] = (groups[i.runeId]||0)+1; });
-  const rows = RUNE_ORDER.slice(0,-1).map(runeId=>({runeId, count:groups[runeId]||0})).filter(r=>r.count>0);
-  if(rows.length===0){ body.innerHTML = '<div class="combine-empty">보유한 룬이 없습니다. 몬스터를 처치해 룬을 획득하세요.</div>'; return; }
-  body.innerHTML = rows.map(r=>{
-    const rd = RUNES[r.runeId];
-    const nextRune = RUNES[RUNE_ORDER[RUNE_ORDER.indexOf(r.runeId)+1]];
-    return `<div class="combine-row">
-      <div class="combine-row-info">
-        <div class="combine-row-name" style="color:${rd.color};">${rd.name} x${r.count}</div>
-        <div class="combine-row-desc">3개 → ${nextRune.name} 1개</div>
-      </div>
-      <button class="combine-row-btn" data-rune="${r.runeId}" ${r.count>=3?'':'disabled'}>조합하기</button>
-    </div>`;
-  }).join('');
-  body.querySelectorAll('.combine-row-btn').forEach(btn=>{
+  const upgradeRows = RUNE_ORDER.slice(0,-1).map(runeId=>({runeId, count:groups[runeId]||0})).filter(r=>r.count>0);
+  const splitRows = RUNE_ORDER.slice(1).map(runeId=>({runeId, count:groups[runeId]||0})).filter(r=>r.count>0);
+
+  let html = '<div class="combine-section-title">① 동일 룬 승급 (3개 → 다음 단계 룬 1개)</div>';
+  if(upgradeRows.length===0){
+    html += '<div class="combine-empty">보유한 룬이 없습니다. 몬스터를 처치해 룬을 획득하세요.</div>';
+  } else {
+    html += upgradeRows.map(r=>{
+      const rd = RUNES[r.runeId];
+      const nextRune = RUNES[RUNE_ORDER[RUNE_ORDER.indexOf(r.runeId)+1]];
+      return `<div class="combine-row">
+        <div class="combine-row-info">
+          <div class="combine-row-name" style="color:${rd.color};">${rd.name} x${r.count}</div>
+          <div class="combine-row-desc">3개 → ${nextRune.name} 1개</div>
+        </div>
+        <button class="combine-row-btn" data-rune="${r.runeId}" ${r.count>=3?'':'disabled'}>조합하기</button>
+      </div>`;
+    }).join('');
+  }
+
+  html += '<div class="combine-section-title">② 룬 역합성 (룬 1개 → 하위 단계 룬 2개로 분해)</div>';
+  if(splitRows.length===0){
+    html += '<div class="combine-empty">분해할 수 있는 룬이 없습니다 (엘 룬은 더 분해할 수 없습니다).</div>';
+  } else {
+    html += splitRows.map(r=>{
+      const rd = RUNES[r.runeId];
+      const lowerRune = RUNES[RUNE_ORDER[RUNE_ORDER.indexOf(r.runeId)-1]];
+      return `<div class="combine-row">
+        <div class="combine-row-info">
+          <div class="combine-row-name" style="color:${rd.color};">${rd.name} x${r.count}</div>
+          <div class="combine-row-desc">1개 → ${lowerRune.name} 2개</div>
+        </div>
+        <button class="combine-row-btn" data-split="${r.runeId}">분해하기</button>
+      </div>`;
+    }).join('');
+  }
+
+  body.innerHTML = html;
+  body.querySelectorAll('.combine-row-btn[data-rune]').forEach(btn=>{
     btn.addEventListener('click', ()=> combineRunes(btn.dataset.rune));
+  });
+  body.querySelectorAll('.combine-row-btn[data-split]').forEach(btn=>{
+    btn.addEventListener('click', ()=> splitRune(btn.dataset.split));
   });
 }
 
@@ -3093,34 +3248,78 @@ function renderCombineFusionTab(){
   const body = document.getElementById('combine-body');
   const gems = player.inventory.filter(i=>i.slot==='gem');
   const runes = player.inventory.filter(i=>i.slot==='rune');
+  const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
+
+  let html = '<div class="combine-section-title">① 기본 융합 (보석 1개 + 룬 1개 → 각인석)</div>';
   if(gems.length===0 || runes.length===0){
-    body.innerHTML = '<div class="combine-empty">보석과 룬을 각각 최소 1개씩 보유해야 융합할 수 있습니다.</div>';
-    return;
-  }
-  body.innerHTML = `
-    <div id="combine-fusion-pickers">
+    html += '<div class="combine-empty">보석과 룬을 각각 최소 1개씩 보유해야 융합할 수 있습니다.</div>';
+  } else {
+    html += `<div id="combine-fusion-pickers">
       <select id="fusion-gem-select">${gems.map(g=>`<option value="${g.uid}">${g.name}</option>`).join('')}</select>
       <select id="fusion-rune-select">${runes.map(r=>`<option value="${r.uid}">${r.name}</option>`).join('')}</select>
     </div>
-    <div id="combine-fusion-preview"></div>
-    <button class="combine-row-btn" id="fusion-btn" style="width:100%;">융합하기 (보석 1개 + 룬 1개 소모)</button>
-  `;
-  const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
-  const updatePreview = ()=>{
-    const gemUid = Number(document.getElementById('fusion-gem-select').value);
-    const runeUid = Number(document.getElementById('fusion-rune-select').value);
-    const gemItem = gems.find(g=>g.uid===gemUid);
-    const runeItem = runes.find(r=>r.uid===runeUid);
-    const previewEl = document.getElementById('combine-fusion-preview');
-    if(!gemItem || !runeItem){ previewEl.textContent=''; return; }
-    const stats = computeFusionStats(gemItem, runeItem);
-    const text = Object.entries(stats).filter(([,v])=>v).map(([k,v])=>`${labels[k]} +${v}${k==='crit'?'%':''}`).join(', ');
-    previewEl.textContent = '결과 능력치: ' + text;
-  };
-  document.getElementById('fusion-gem-select').addEventListener('change', updatePreview);
-  document.getElementById('fusion-rune-select').addEventListener('change', updatePreview);
-  document.getElementById('fusion-btn').addEventListener('click', doFusion);
-  updatePreview();
+    <div id="combine-fusion-preview" class="combine-preview"></div>
+    <button class="combine-row-btn" id="fusion-btn" style="width:100%;">융합하기 (보석 1개 + 룬 1개 소모)</button>`;
+  }
+
+  html += '<div class="combine-section-title">② 상급 융합 (서로 다른 보석 2개 + 룬 1개 → 강화된 각인석)</div>';
+  if(gems.length < 2 || runes.length===0){
+    html += '<div class="combine-empty">서로 다른 보석 2개와 룬 1개가 필요합니다.</div>';
+  } else {
+    html += `<div id="adv-fusion-pickers">
+      <select id="adv-gem-a-select">${gems.map(g=>`<option value="${g.uid}">${g.name}</option>`).join('')}</select>
+      <select id="adv-gem-b-select">${gems.map(g=>`<option value="${g.uid}">${g.name}</option>`).join('')}</select>
+      <select id="adv-rune-select">${runes.map(r=>`<option value="${r.uid}">${r.name}</option>`).join('')}</select>
+    </div>
+    <div id="adv-fusion-preview" class="combine-preview"></div>
+    <button class="combine-row-btn" id="adv-fusion-btn" style="width:100%;">상급 융합하기 (보석 2개 + 룬 1개 소모)</button>`;
+  }
+
+  body.innerHTML = html;
+
+  if(gems.length>0 && runes.length>0){
+    const updatePreview = ()=>{
+      const gemUid = Number(document.getElementById('fusion-gem-select').value);
+      const runeUid = Number(document.getElementById('fusion-rune-select').value);
+      const gemItem = gems.find(g=>g.uid===gemUid);
+      const runeItem = runes.find(r=>r.uid===runeUid);
+      const previewEl = document.getElementById('combine-fusion-preview');
+      if(!gemItem || !runeItem){ previewEl.textContent=''; return; }
+      const stats = computeFusionStats(gemItem, runeItem);
+      const text = Object.entries(stats).filter(([,v])=>v).map(([k,v])=>`${labels[k]} +${v}${k==='crit'?'%':''}`).join(', ');
+      previewEl.textContent = '결과 능력치: ' + text;
+    };
+    document.getElementById('fusion-gem-select').addEventListener('change', updatePreview);
+    document.getElementById('fusion-rune-select').addEventListener('change', updatePreview);
+    document.getElementById('fusion-btn').addEventListener('click', doFusion);
+    updatePreview();
+  }
+
+  if(gems.length>=2 && runes.length>0){
+    const updateAdvPreview = ()=>{
+      const uidA = Number(document.getElementById('adv-gem-a-select').value);
+      const uidB = Number(document.getElementById('adv-gem-b-select').value);
+      const runeUid = Number(document.getElementById('adv-rune-select').value);
+      const gemA = gems.find(g=>g.uid===uidA), gemB = gems.find(g=>g.uid===uidB);
+      const runeItem = runes.find(r=>r.uid===runeUid);
+      const previewEl = document.getElementById('adv-fusion-preview');
+      const btn = document.getElementById('adv-fusion-btn');
+      if(!gemA || !gemB || !runeItem || uidA===uidB){
+        previewEl.textContent = gemA && gemB && uidA===uidB ? '서로 다른 보석 2개를 선택하세요' : '';
+        btn.disabled = true;
+        return;
+      }
+      btn.disabled = false;
+      const stats = computeAdvancedFusionStats(gemA, gemB, runeItem);
+      const text = Object.entries(stats).filter(([,v])=>v).map(([k,v])=>`${labels[k]} +${v}${k==='crit'?'%':''}`).join(', ');
+      previewEl.textContent = '결과 능력치: ' + text;
+    };
+    document.getElementById('adv-gem-a-select').addEventListener('change', updateAdvPreview);
+    document.getElementById('adv-gem-b-select').addEventListener('change', updateAdvPreview);
+    document.getElementById('adv-rune-select').addEventListener('change', updateAdvPreview);
+    document.getElementById('adv-fusion-btn').addEventListener('click', doAdvancedFusion);
+    updateAdvPreview();
+  }
 }
 
 function renderCombinePanel(){
