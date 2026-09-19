@@ -30,7 +30,16 @@
   .bar-fill{height:100%;transition:width 0.25s ease;}
   .bar-hp{background:linear-gradient(180deg,#ff5c5c,#a11d1d);}
   .bar-xp{background:linear-gradient(180deg,#4a9eff,#1d5aa1);}
+  .bar-mp{background:linear-gradient(180deg,#3ddcd8,#1a6e6b);}
   .bar-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;text-shadow:0 1px 2px #000;}
+  #hud-status-effects{margin-top:6px;font-size:10px;line-height:1.6;}
+  #hud-status-effects .fx-line{display:flex;align-items:center;gap:4px;color:#dbe8ff;}
+  #hud-status-effects .fx-line .fx-icon{font-size:11px;}
+  #hud-status-effects .fx-line .fx-timer{color:#8ad8ff;margin-left:auto;}
+  #hud-status-effects .fx-line.debuff{color:#ff9a9a;}
+  #hud-status-effects .fx-line.debuff .fx-timer{color:#ff9a9a;}
+  #hud-status-effects .fx-line.event{color:#ffd84a;}
+  #hud-status-effects .fx-line.event .fx-timer{color:#ffd84a;}
   #gold-display{font-size:13px;color:var(--gold);font-weight:bold;display:flex;align-items:center;gap:4px;}
   #set-bonus-list{margin-top:6px;font-size:11px;color:var(--rarity-set);line-height:1.5;}
 
@@ -88,6 +97,7 @@
   .inv-slot .slot-icon{position:absolute;top:2px;left:3px;font-size:10px;opacity:0.55;}
   .inv-slot .item-name-small{color:inherit;}
   .inv-slot .enh-badge{position:absolute;top:1px;right:2px;font-size:9px;color:var(--gold);font-weight:bold;}
+  .inv-slot .socket-count-badge{position:absolute;bottom:1px;left:2px;font-size:9px;color:#c77dff;font-weight:bold;}
   .inv-slot.upgrade{box-shadow:0 0 8px rgba(92,255,138,0.55);}
   .inv-slot.upgrade:hover{box-shadow:0 0 12px rgba(92,255,138,0.8);}
   .upgrade-badge{position:absolute;bottom:1px;right:1px;width:16px;height:16px;border-radius:50%;background:#1a3d24;border:1px solid #5cff8a;color:#5cff8a;font-size:10px;line-height:14px;padding:0;cursor:pointer;animation:upgradePulse 1.4s ease-in-out infinite;}
@@ -188,12 +198,6 @@
   /* ---------- 세계관/도감 패널 ---------- */
   #codex-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:480px;max-width:92vw;max-height:74vh;overflow-y:auto;padding:16px;color:#eee;}
   #codex-panel.hidden{display:none;}
-  #codex-tabs{display:flex;gap:8px;margin-bottom:10px;}
-  .codex-tab{flex:1;padding:6px 0;background:rgba(255,255,255,0.05);border:1px solid var(--panel-border);color:#aaa;font-size:12px;cursor:pointer;border-radius:4px;}
-  .codex-tab.active{background:rgba(232,198,106,0.15);color:var(--gold);border-color:var(--gold);}
-  .codex-section{margin-bottom:14px;}
-  .codex-section h3{margin:0 0 4px;font-size:13px;color:var(--gold);}
-  .codex-section p{margin:0;font-size:12px;line-height:1.7;color:#ccc;}
   .codex-mon-card{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:6px;margin-bottom:6px;border-left:3px solid #555;}
   .codex-mon-card.boss{border-left-color:var(--gold);}
   .codex-mon-name{font-size:12px;color:#eee;}
@@ -292,9 +296,14 @@
       <div style="width:30px;"></div>
       <div class="bar-wrap" style="height:10px;"><div class="bar-fill bar-xp" id="xp-bar" style="width:0%"></div></div>
     </div>
+    <div class="row" id="hud-mp-row" style="display:none;">
+      <div style="width:30px;"></div>
+      <div class="bar-wrap" style="height:11px;"><div class="bar-fill bar-mp" id="hud-mp-bar" style="width:100%"></div><div class="bar-text" id="hud-mp-text" style="font-size:9px;"></div></div>
+    </div>
     <div id="gold-display">🪙 <span id="gold-amount">0</span> G &nbsp; 💎 <span id="stone-amount">0</span></div>
     <div id="rebirth-badge" style="display:none;font-size:11px;color:#ffd84a;margin-top:2px;"></div>
     <div id="set-bonus-list"></div>
+    <div id="hud-status-effects"></div>
   </div>
 
   <div id="quest-tracker" class="panel empty"></div>
@@ -330,12 +339,12 @@
   <div id="toast-container"></div>
   <div id="npc-prompt">E: 대화</div>
 
-  <div id="controls-hint">WASD/방향키·클릭: 이동 · 클릭/Z: 공격 · 1/2/3/4: 스킬 · Space: 회피 · Q: 포션 · R: 탈것 · E: NPC 대화 · I: 인벤토리 · L: 퀘스트 · K: 세계관 · C: 능력치</div>
+  <div id="controls-hint">WASD/방향키·클릭: 이동 · 클릭/Z: 공격 · 1/2/3/4: 스킬 · Space: 회피 · Q: 포션 · R: 탈것 · E: NPC 대화 · I: 인벤토리 · L: 퀘스트 · K: 도감 · C: 능력치</div>
 
   <div id="bottom-bar">
     <button id="btn-inventory">🎒 인벤토리 (I)</button>
     <button id="btn-questlog">📜 퀘스트 (L)</button>
-    <button id="btn-codex">📖 세계관 (K)</button>
+    <button id="btn-codex">📖 몬스터 도감 (K)</button>
     <button id="btn-statpanel">✦ 능력치 (C)<span id="stat-points-badge" class="hidden"></span></button>
   </div>
 
@@ -396,12 +405,8 @@
 
   <div id="codex-panel" class="panel hidden">
     <div class="ql-header">
-      <h2>세계관 · 도감</h2>
+      <h2>몬스터 도감</h2>
       <button class="ql-close" id="codex-close">✕</button>
-    </div>
-    <div id="codex-tabs">
-      <button class="codex-tab active" data-tab="lore">세계관</button>
-      <button class="codex-tab" data-tab="bestiary">몬스터 도감</button>
     </div>
     <div id="codex-body"></div>
   </div>
@@ -864,6 +869,13 @@ const STAT_ALLOC_INFO = {
   agi:{ label:'민첩 (AGI)', desc:'치명타 +0.3%' },
   int:{ label:'지능 (INT)', desc:'최대 마력 +5' },
   vit:{ label:'체력 (VIT)', desc:'최대 체력 +4' },
+};
+// 좌상단 상태창 아래 버프/디버프/이벤트 표시용 라벨 (BUFF_ICONS와 공유되는 아이콘)
+const STATUS_EFFECT_LABELS = {
+  atk:{ icon:'⚔️', label:'공격력 증가', type:'buff' },
+  def:{ icon:'🛡️', label:'방어력 증가', type:'buff' },
+  speed:{ icon:'💨', label:'이동속도 증가', type:'buff' },
+  dmgReduction:{ icon:'🔰', label:'피해 감소', type:'buff' },
 };
 const REBIRTH_LEVEL = 20;
 const REBIRTH_BONUS_PCT = 8; // 환생 1회당 영구 능력치 증가율(%)
@@ -2681,46 +2693,25 @@ function renderQuestLog(){
   });
 }
 
-/* ---------------------------- 세계관 / 도감 ---------------------------- */
+/* ---------------------------- 몬스터 도감 ---------------------------- */
 
-const LORE_SECTIONS = [
-  { title:'크로노스 대륙', text:'오래 전, 크로노스 대륙은 시간의 신 크로노스가 다스리는 평화로운 땅이었다. 그러나 신들의 전쟁이 대륙을 갈랐고, 시간의 흐름이 곳곳에서 뒤틀리기 시작했다. 살아남은 자들은 무너진 신전 옆에 작은 마을을 세우고, 뒤틀린 시간 속에서 몬스터로 변해버린 존재들과 맞서며 살아간다.' },
-  { title:'오크 소굴', text:'마을 서쪽 숲 깊은 곳, 오크 부족이 무너진 신전의 잔해를 차지하고 소굴을 세웠다. 그들의 대장은 신전에서 흘러나온 힘을 탐하다 결국 오크 군주로 타락했다고 전해진다. 마을을 지키려면 이 소굴을 정리해야 한다.' },
-  { title:'심연의 균열', text:'대륙 동쪽, 시간이 완전히 끊어진 자리에 거대한 균열이 열렸다. 균열 너머에서는 시간을 잃은 존재들 — 망령, 파수병, 촉수 — 이 끊임없이 흘러나온다. 그 심연 가장 깊은 곳에는 균열을 다스리는 심연의 지배자가 잠들어 있다.' },
-  { title:'네 개의 길', text:'모험가들은 저마다 다른 길을 걷는다. 검과 방패로 균형을 이루는 파이터, 거대한 무기로 모든 것을 부수는 새비지, 창과 신념으로 전장을 가르는 발키리, 그리고 방어를 꿰뚫는 시간의 마법을 다루는 마법사. 크로노스의 뒤틀린 시간 속에서 마법사만이 방어의 굴레를 완전히 무시할 수 있다고 전해진다.' },
-  { title:'환생과 굴레', text:'레벨 20에 도달한 자는 마을 촌장에게서 환생의 의식을 치를 수 있다. 이는 육신의 힘을 처음으로 되돌리는 대신, 영혼에 새겨진 힘을 영구히 강하게 만드는 크로노스의 오랜 의식이다.' },
-];
-
-let codexActiveTab = 'lore';
-function renderCodex(tab){
+function renderCodex(){
   const body = document.getElementById('codex-body');
-  if(tab === 'lore'){
-    body.innerHTML = LORE_SECTIONS.map(s=>`<div class="codex-section"><h3>${s.title}</h3><p>${s.text}</p></div>`).join('');
-  } else {
-    body.innerHTML = Object.keys(MONSTER_DEFS).map(type=>{
-      const def = MONSTER_DEFS[type];
-      if(!player.discoveredMonsters.includes(type)){
-        return `<div class="codex-mon-card codex-mon-locked"><span class="codex-mon-name">???</span><span class="codex-mon-stats">미발견</span></div>`;
-      }
-      return `<div class="codex-mon-card ${def.isBoss?'boss':''}"><span class="codex-mon-name">${def.isBoss?'★ ':''}${def.name}</span>`+
-        `<span class="codex-mon-stats">HP ${def.hp} · 공격 ${def.atk} · 방어 ${def.def}</span></div>`;
-    }).join('');
-  }
+  body.innerHTML = Object.keys(MONSTER_DEFS).map(type=>{
+    const def = MONSTER_DEFS[type];
+    if(!player.discoveredMonsters.includes(type)){
+      return `<div class="codex-mon-card codex-mon-locked"><span class="codex-mon-name">???</span><span class="codex-mon-stats">미발견</span></div>`;
+    }
+    return `<div class="codex-mon-card ${def.isBoss?'boss':''}"><span class="codex-mon-name">${def.isBoss?'★ ':''}${def.name}</span>`+
+      `<span class="codex-mon-stats">HP ${def.hp} · 공격 ${def.atk} · 방어 ${def.def}</span></div>`;
+  }).join('');
 }
 function toggleCodex(){
   codexPanel.classList.toggle('hidden');
-  if(!codexPanel.classList.contains('hidden')) renderCodex(codexActiveTab);
+  if(!codexPanel.classList.contains('hidden')) renderCodex();
 }
 document.getElementById('codex-close').addEventListener('click', toggleCodex);
 document.getElementById('btn-codex').addEventListener('click', toggleCodex);
-document.querySelectorAll('.codex-tab').forEach(btn=>{
-  btn.addEventListener('click', ()=>{
-    document.querySelectorAll('.codex-tab').forEach(b=>b.classList.remove('active'));
-    btn.classList.add('active');
-    codexActiveTab = btn.dataset.tab;
-    renderCodex(codexActiveTab);
-  });
-});
 
 /* ---------------------------- 능력치 분배 ---------------------------- */
 
@@ -3325,6 +3316,7 @@ function refreshHUD(){
   document.getElementById('xp-bar').style.width = (player.xp/player.xpToNext*100)+'%';
   document.getElementById('gold-amount').textContent = player.gold;
   document.getElementById('stone-amount').textContent = player.enhanceStones;
+  updateHudExtras();
 
   const rebirthBadge = document.getElementById('rebirth-badge');
   if(player.rebirths > 0){
@@ -3532,6 +3524,29 @@ function updateCdOverlay(slotId, cdValue){
   } else if(overlay){ overlay.remove(); }
 }
 
+// 좌상단 상태창의 마나 바 + 버프/디버프/이벤트 목록 갱신 (100ms 간격으로도 호출되어 남은 시간이 부드럽게 줄어듦)
+function updateHudExtras(){
+  const mpRow = document.getElementById('hud-mp-row');
+  if(player.classId){
+    mpRow.style.display = 'flex';
+    const mpPct = clamp(player.mp/player.baseMp*100,0,100);
+    document.getElementById('hud-mp-bar').style.width = mpPct+'%';
+    document.getElementById('hud-mp-text').textContent = `${Math.round(player.mp)}/${player.baseMp}`;
+  } else {
+    mpRow.style.display = 'none';
+  }
+
+  const fxEl = document.getElementById('hud-status-effects');
+  const fxLines = [];
+  for(const k in player.buffTimers){
+    if(player.buffTimers[k] > 0 && STATUS_EFFECT_LABELS[k]){
+      const info = STATUS_EFFECT_LABELS[k];
+      fxLines.push(`<div class="fx-line ${info.type}"><span class="fx-icon">${info.icon}</span><span>${info.label}</span><span class="fx-timer">${Math.ceil(player.buffTimers[k])}초</span></div>`);
+    }
+  }
+  fxEl.innerHTML = fxLines.join('');
+}
+
 function updateOrbs(){
   if(!player.classId) return;
   const stats = getTotalStats();
@@ -3615,6 +3630,7 @@ setInterval(()=>{
   updateCdOverlay('slot-basic', basicAttackState.cd);
   updateOrbs();
   updateBuffRow();
+  updateHudExtras();
   updateTargetFrame();
 }, 100);
 setInterval(updateMinimap, 300);
@@ -3670,6 +3686,12 @@ function renderInventory(){
       div.style.color = RARITY[item.rarity].color;
       div.textContent = (item.enhance>0?`+${item.enhance} `:'')+item.name;
       slotEl.appendChild(div);
+      if(item.sockets > 0){
+        const sockBadge = document.createElement('span');
+        sockBadge.className = 'socket-count-badge';
+        sockBadge.textContent = `🔮${(item.runes?item.runes.length:0)}/${item.sockets}`;
+        slotEl.appendChild(sockBadge);
+      }
     }
     slotEl.onclick = ()=>{
       if(item){ selectItem(item, slot); }
@@ -3702,6 +3724,13 @@ function renderInventory(){
         badge.className = 'enh-badge';
         badge.textContent = '+'+item.enhance;
         div.appendChild(badge);
+      }
+      if(item.sockets > 0){
+        const sockBadge = document.createElement('div');
+        sockBadge.className = 'socket-count-badge';
+        sockBadge.textContent = `🔮${(item.runes?item.runes.length:0)}/${item.sockets}`;
+        sockBadge.title = `소켓 ${item.runes?item.runes.length:0}/${item.sockets}`;
+        div.appendChild(sockBadge);
       }
       if(isUpgrade(item)){
         div.classList.add('upgrade');
