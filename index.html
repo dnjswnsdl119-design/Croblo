@@ -2035,9 +2035,31 @@ function useClassSkill(slotKey){
     }
     SFX.crit();
     if(target.hp <= 0) killMonster(target);
+    // 스킬 최대 랭크 도달 시 형태가 변화한다: 단일 대상 스킬이 추가 대상까지 타격 (연쇄/멀티샷)
+    const maxRank = SKILL_TREE_REQS[slotKey] ? SKILL_TREE_REQS[slotKey].length : 1;
+    if(rank >= maxRank && maxRank > 1){
+      const chainRange = 6;
+      const extraTargets = monsters.filter(m=>m.alive && m!==target && target.pos.distanceTo(m.pos) < chainRange).slice(0,2);
+      extraTargets.forEach(m=>{
+        const isCrit2 = Math.random()*100 < stats.crit;
+        let dmg2 = Math.max(1, Math.round(stats.atk*mult*0.7*rand(0.9,1.1) - m.def.def*0.5*getDefPenetration()));
+        if(isCrit2) dmg2 = Math.round(dmg2*1.8);
+        m.hp -= dmg2;
+        applyGrowthLifesteal(dmg2);
+        const wp2 = m.pos.clone(); wp2.y = 2.2*m.def.scale;
+        spawnDamageNumberAt(wp2, dmg2, isCrit2, '#ff8a2a');
+        updateMonsterBar(m);
+        checkBossPhaseTransition(m);
+        if(skill.type==='ranged_single') spawnCastBolt(playerState.pos, m.pos, 0x8a5aff);
+        else flashSkillEffect(m.pos, 0xff8a2a, 1.2);
+        if(m.hp <= 0) killMonster(m);
+      });
+    }
   } else if(isAoe){
     const center = target ? target.pos : playerState.pos;
-    const radius = skill.radius || 3.6;
+    // 스킬 최대 랭크 도달 시 형태가 변화한다: 광역 스킬의 타격 범위가 넓어진다
+    const aoeMaxRank = SKILL_TREE_REQS[slotKey] ? SKILL_TREE_REQS[slotKey].length : 1;
+    const radius = (skill.radius || 3.6) * (rank >= aoeMaxRank && aoeMaxRank > 1 ? 1.4 : 1);
     const nearby = monsters.filter(m=>m.alive && center.distanceTo(m.pos) < radius);
     if(nearby.length === 0){ spawnToast('주변에 대상이 없습니다', '#888'); }
     else if(!target) playerState.targetMonster = nearby[0];
@@ -4023,9 +4045,14 @@ function renderSkillTree(){
         const canLearn = reqMet && player.skillPoints > 0;
         btnHtml = `<button class="skill-row-btn" data-key="${key}" ${canLearn?'':'disabled'}>${rank===0?'스킬 배우기':'랭크업'} (포인트 1)</button>`;
       }
+      const formGrowth = maxRank > 1 && (skill.type==='melee_single'||skill.type==='ranged_single')
+        ? '<div class="skill-row-desc" style="color:#8ad8ff;">✨ 최대 랭크: 주변 추가 대상까지 연쇄 타격</div>'
+        : maxRank > 1 && (skill.type==='melee_aoe'||skill.type==='ranged_aoe')
+        ? '<div class="skill-row-desc" style="color:#8ad8ff;">✨ 최대 랭크: 타격 범위가 넓어짐</div>'
+        : '';
       html += `<div class="skill-row ${maxed?'maxed':''} ${tier.branch?'branch-item':''}">`+
         `<div class="skill-row-top"><span class="skill-row-icon">${skill.icon}</span><span class="skill-row-name">${skill.name}</span><span class="skill-row-rank">${rank}/${maxRank}</span></div>`+
-        `<div class="skill-row-desc">${skill.desc||''}</div>`+
+        `<div class="skill-row-desc">${skill.desc||''}</div>`+ formGrowth +
         reqHtml + btnHtml +
       `</div>`;
     });
