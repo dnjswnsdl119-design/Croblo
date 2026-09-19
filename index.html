@@ -2314,6 +2314,33 @@ function updateWeaponVisual(){
   });
 }
 
+// 장비 성장의 시각적 진화: 장착한 장비 중 최고 등급이 세트/유니크에 도달하면 발밑에 그 등급 색의 오라 링이 나타난다.
+// 희귀/제작 등급까지는 수치로만 체감되던 성장을, 세트/유니크부터는 캐릭터를 보기만 해도 알 수 있게 한다.
+let playerAuraRing = null;
+function updatePlayerRarityAura(){
+  let bestTier = -1, bestRarity = null;
+  for(const slot of EQUIP_SLOTS){
+    const item = player.equipment[slot];
+    if(!item) continue;
+    const tier = RARITY_TIER[item.rarity] ?? -1;
+    if(tier > bestTier){ bestTier = tier; bestRarity = item.rarity; }
+  }
+  const showAura = bestTier >= RARITY_TIER.set;
+  if(showAura){
+    const color = RARITY[bestRarity].color;
+    if(!playerAuraRing){
+      playerAuraRing = new THREE.Mesh(new THREE.RingGeometry(0.62,0.8,24), new THREE.MeshBasicMaterial({color, transparent:true, opacity:0.8, side:THREE.DoubleSide}));
+      playerAuraRing.rotation.x = -Math.PI/2; playerAuraRing.position.y = 0.08;
+      playerMesh.add(playerAuraRing);
+    } else {
+      playerAuraRing.material.color.set(color);
+      playerAuraRing.visible = true;
+    }
+  } else if(playerAuraRing){
+    playerAuraRing.visible = false;
+  }
+}
+
 /* ---------------------------- 펫 ---------------------------- */
 
 function makePetMesh(){
@@ -5497,6 +5524,7 @@ function refreshHUD(){
   applySkillUI();
 
   updateWeaponVisual();
+  updatePlayerRarityAura();
   saveGame();
 }
 refreshHUD();
