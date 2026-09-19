@@ -546,6 +546,7 @@
       <h2>인벤토리 & 장비</h2>
       <select id="junk-threshold-select" title="잡템 기준 등급 선택"></select>
       <button id="btn-identify-all">🔍 전체 감정</button>
+      <button id="btn-auto-equip">⚡ 자동장착</button>
       <button id="btn-sell-junk">🪙 잡템 정리</button>
       <button id="inv-close">✕</button>
     </div>
@@ -6415,8 +6416,26 @@ function sellJunkItems(){
   return junk.length;
 }
 
+// 인벤토리에 있는 아이템 중 현재 장착 장비보다 강한 것을 부위별로 찾아 한번에 장착
+function autoEquipUpgrades(){
+  let equippedCount = 0;
+  for(const slot of EQUIP_SLOTS){
+    const current = player.equipment[slot];
+    let best = current, bestPower = current ? computeItemPower(current) : -Infinity;
+    for(const cand of player.inventory){
+      if(cand.slot !== slot || cand.identified === false) continue;
+      const p = computeItemPower(cand);
+      if(p > bestPower){ best = cand; bestPower = p; }
+    }
+    if(best !== current) { equipItem(best); equippedCount++; }
+  }
+  if(equippedCount > 0) spawnToast(`자동장착: ${equippedCount}개 부위 업그레이드!`, '#5cff8a');
+  else spawnToast('장착할 업그레이드가 없습니다', '#888');
+}
+
 document.getElementById('btn-sell-junk').addEventListener('click', sellJunkItems);
 document.getElementById('btn-identify-all').addEventListener('click', identifyAllItems);
+document.getElementById('btn-auto-equip').addEventListener('click', autoEquipUpgrades);
 
 const junkSelect = document.getElementById('junk-threshold-select');
 JUNK_RARITY_OPTIONS.forEach(key=>{
