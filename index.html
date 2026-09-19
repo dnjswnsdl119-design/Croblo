@@ -2349,6 +2349,58 @@ function initialSpawn(){
 }
 initialSpawn();
 
+/* ---------------------------- 위험 지역 (Danger Zone) ---------------------------- */
+// 필드 한쪽에 처음엔 절대 이길 수 없는 강한 정예 무리를 고정 배치한다.
+// 나중에 충분히 강해져서 돌아오면 손쉽게 제압할 수 있어 성장 체감을 강하게 준다.
+const DANGER_ZONE_CENTER = new THREE.Vector3(65, 0, 65);
+const DANGER_ZONE_WARN_RADIUS = 22;
+let dangerZoneWarned = false;
+let dangerZoneMarker = null;
+
+function spawnDangerZone(){
+  const ring = new THREE.Mesh(
+    new THREE.RingGeometry(7, 8, 40),
+    new THREE.MeshBasicMaterial({ color:0xff2020, transparent:true, opacity:0.55, side:THREE.DoubleSide })
+  );
+  ring.rotation.x = -Math.PI/2;
+  ring.position.copy(DANGER_ZONE_CENTER); ring.position.y = 0.05;
+  scene.add(ring);
+
+  const label = document.createElement('div');
+  label.style.cssText = 'position:absolute;font-size:12px;font-weight:bold;color:#ff4a4a;text-shadow:0 0 6px #ff2020,0 1px 3px #000;pointer-events:none;white-space:nowrap;transform:translate(-50%,-100%);';
+  label.textContent = '☠ 위험 지역';
+  document.getElementById('game-container').appendChild(label);
+  dangerZoneMarker = { ring, label };
+
+  // 고정 정예 무리: 필드 몬스터 대비 훨씬 강한 스탯과 레벨을 부여
+  const pack = [
+    { type:'orclord',  dx:0,  dz:0,  hpMult:2.2, atkMult:1.8 },
+    { type:'wraith',   dx:-3, dz:2,  hpMult:2.6, atkMult:2.1 },
+    { type:'wraith',   dx:3,  dz:2,  hpMult:2.6, atkMult:2.1 },
+    { type:'sentinel', dx:0,  dz:-3, hpMult:2.6, atkMult:2.1 },
+  ];
+  pack.forEach(p=>{
+    spawnMonster(p.type, DANGER_ZONE_CENTER.x+p.dx, DANGER_ZONE_CENTER.z+p.dz, { hpMult:p.hpMult, atkMult:p.atkMult, levelOverride:35 });
+  });
+}
+spawnDangerZone();
+
+function updateDangerZone(){
+  if(!dangerZoneMarker) return;
+  dangerZoneMarker.ring.rotation.z += 0.15*0.016;
+  const wp = DANGER_ZONE_CENTER.clone(); wp.y = 2.2;
+  const v = wp.project(camera);
+  const x = (v.x*0.5+0.5)*window.innerWidth, y = (-v.y*0.5+0.5)*window.innerHeight;
+  const visible = v.z < 1 && Math.abs(v.x) < 1.05 && Math.abs(v.y) < 1.05 && !isInFixedUIArea(x,y);
+  dangerZoneMarker.label.style.display = visible ? 'block' : 'none';
+  if(visible){ dangerZoneMarker.label.style.left = x+'px'; dangerZoneMarker.label.style.top = y+'px'; }
+
+  if(!dangerZoneWarned && !player.inDungeon && playerState.pos.distanceTo(DANGER_ZONE_CENTER) < DANGER_ZONE_WARN_RADIUS){
+    dangerZoneWarned = true;
+    spawnToast('☠ 위험한 기운이 느껴진다... 이 지역의 몬스터는 매우 강력합니다.', '#ff4a4a');
+  }
+}
+
 let respawnTimer = 0;
 
 function removeMonster(m){
@@ -4812,6 +4864,7 @@ function animate(){
   updateNPCs(dt);
   updatePet(dt);
   updateBars();
+  updateDangerZone();
 
   renderer.render(scene, camera);
 }
