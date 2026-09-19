@@ -2026,6 +2026,7 @@ function useClassSkill(slotKey){
     const wp = target.pos.clone(); wp.y = 2.2*target.def.scale;
     spawnDamageNumberAt(wp, dmg, true, '#ff8a2a');
     updateMonsterBar(target);
+    checkBossPhaseTransition(target);
     flashSkillEffect(target.pos, 0xff8a2a, 1.6);
     if(skill.type==='ranged_single') spawnCastBolt(playerState.pos, target.pos, 0x8a5aff);
     SFX.crit();
@@ -2045,6 +2046,7 @@ function useClassSkill(slotKey){
       const wp = m.pos.clone(); wp.y = 2.0*m.def.scale;
       spawnDamageNumberAt(wp, dmg, isCrit, '#4ad0ff');
       updateMonsterBar(m);
+      checkBossPhaseTransition(m);
       if(m.hp <= 0) killMonster(m);
     });
     flashSkillEffect(center, 0x4ad0ff, radius);
@@ -2158,6 +2160,7 @@ function updateEvilSpirits(dt){
         const wp = m.pos.clone(); wp.y = 2.0*m.def.scale;
         spawnDamageNumberAt(wp, dmg, isCrit, sk.dmgColor);
         updateMonsterBar(m);
+        checkBossPhaseTransition(m);
         if(m.hp <= 0) killMonster(m);
       });
     }
@@ -2246,6 +2249,7 @@ function updatePet(dt){
       const wp = target.pos.clone(); wp.y = 1.6*target.def.scale;
       spawnDamageNumberAt(wp, dmg, false, '#8ad8ff');
       updateMonsterBar(target);
+      checkBossPhaseTransition(target);
       if(target.hp <= 0) killMonster(target);
     }
   }
@@ -2323,6 +2327,8 @@ function spawnMonster(typeKey, x, z, opts){
     barWrap, barFill, nameTag,
     alive:true,
     isDungeon: !!opts.isDungeon,
+    bossPhase: def.isBoss ? 1 : undefined,
+    phaseAtkMult: 1, phaseCdMult: 1,
   };
   monsters.push(m);
   return m;
@@ -2456,7 +2462,7 @@ function monsterShootProjectile(m){
   scene.add(mesh);
   projectiles.push({
     mesh, pos:startPos.clone(), vel:dir.multiplyScalar(m.def.projSpeed||12),
-    dmg: m.def.atk, life:2.5, sourceMonster:m,
+    dmg: m.def.atk*(m.phaseAtkMult||1), life:2.5, sourceMonster:m,
   });
   SFX.shoot();
 }
@@ -4553,6 +4559,7 @@ function playerAttack(monster){
   const worldPos = monster.pos.clone(); worldPos.y = 2.0*monster.def.scale;
   spawnDamageNumberAt(worldPos, realDmg, isCrit);
   updateMonsterBar(monster);
+  checkBossPhaseTransition(monster);
   if(isCrit) SFX.crit(); else SFX.hit();
   if(monster.hp > 0) SFX.monsterHurt();
   if(getClassDef()?.ranged) spawnCastBolt(playerState.pos, monster.pos, 0x8a5aff);
@@ -4651,6 +4658,42 @@ function updateMonsterBar(m){
   m.barFill.style.width = Math.max(0,(m.hp/m.maxHp*100))+'%';
 }
 
+/* ---------------------------- 보스 페이즈 ---------------------------- */
+// HP 비율이 문턱값을 넘어갈 때마다 페이즈가 올라가며 공격력/공격속도가 강해지고,
+// 한 번씩 넓은 범위의 "페이즈 전환 파동"으로 근처 플레이어에게 피해를 준다 - 일반 몬스터와는 다른 보스만의 리듬을 만든다.
+const BOSS_PHASE_THRESHOLDS = [0.66, 0.33];
+const BOSS_PHASE_MULT = [ {atk:1.0, cd:1.0}, {atk:1.3, cd:0.75}, {atk:1.7, cd:0.55} ];
+function checkBossPhaseTransition(m){
+  if(!m.def.isBoss || !m.alive) return;
+  const pct = m.hp / m.maxHp;
+  const nextPhase = BOSS_PHASE_THRESHOLDS.filter(t=>pct<=t).length + 1;
+  if(nextPhase <= m.bossPhase) return;
+  m.bossPhase = nextPhase;
+  const mult = BOSS_PHASE_MULT[Math.min(nextPhase-1, BOSS_PHASE_MULT.length-1)];
+  m.phaseAtkMult = mult.atk;
+  m.phaseCdMult = mult.cd;
+  const phaseLabel = nextPhase >= 3 ? '격노!' : '태세 전환!';
+  spawnToast(`⚠ ${m.def.name} ${phaseLabel} (${nextPhase}페이즈 - 공격력/공격속도 증가)`, '#ff5c5c');
+  if(m.nameTag) m.nameTag.textContent = `★ Lv.${m.level} ${m.def.name} [${nextPhase}페이즈]`;
+  if(m.barFill) m.barFill.style.background = nextPhase>=3 ? '#ff2020' : nextPhase>=2 ? '#ff6a20' : '#e33';
+  SFX.crit();
+  flashSkillEffect(m.pos, 0xff3838, 4.5);
+  // 전환 파동: 근처에 있으면 피해
+  const wp = playerState.pos.clone(); wp.y = 2.2;
+  if(playerState.pos.distanceTo(m.pos) < 4.5 && player.alive && !playerState.invulnerable){
+    const stats = getTotalStats();
+    let dmg = Math.max(1, Math.round(m.def.atk*1.4 - stats.def*0.4));
+    dmg = Math.max(1, Math.round(dmg*(1-getDamageReduction())));
+    player.hp -= dmg;
+    spawnDamageNumberAt(wp, dmg, false, '#ff3838');
+    SFX.playerHurt();
+    refreshHUD();
+    if(player.hp <= 0) onPlayerDeath();
+  } else {
+    spawnDamageNumberAt(wp, '회피!', false, '#8ad8ff');
+  }
+}
+
 function monsterAttackPlayer(m){
   // 몬스터가 먼저 공격해와도 상태창에 표시되도록 현재 타겟으로 지정
   playerState.targetMonster = m;
@@ -4660,7 +4703,7 @@ function monsterAttackPlayer(m){
     return;
   }
   const stats = getTotalStats();
-  let dmg = Math.max(1, Math.round(m.def.atk*rand(0.8,1.2) - stats.def*0.4));
+  let dmg = Math.max(1, Math.round(m.def.atk*(m.phaseAtkMult||1)*rand(0.8,1.2) - stats.def*0.4));
   dmg = Math.max(1, Math.round(dmg*(1-getDamageReduction())));
   player.hp -= dmg;
   const wp = playerState.pos.clone(); wp.y = 2.2;
@@ -4892,7 +4935,7 @@ function updateMonsters(dt){
         m.attackCooldown -= dt;
         if(m.attackCooldown <= 0){
           monsterShootProjectile(m);
-          m.attackCooldown = 1.7;
+          m.attackCooldown = 1.7*(m.phaseCdMult||1);
         }
       }
     } else if(m.state === 'chase' && player.alive){
@@ -4909,7 +4952,7 @@ function updateMonsters(dt){
         m.attackCooldown -= dt;
         if(m.attackCooldown <= 0){
           monsterAttackPlayer(m);
-          m.attackCooldown = 1.1;
+          m.attackCooldown = 1.1*(m.phaseCdMult||1);
         }
       }
     } else if(m.state === 'return'){
