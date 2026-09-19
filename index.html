@@ -2029,7 +2029,10 @@ function useClassSkill(slotKey){
     updateMonsterBar(target);
     checkBossPhaseTransition(target);
     flashSkillEffect(target.pos, 0xff8a2a, 1.6);
-    if(skill.type==='ranged_single') spawnCastBolt(playerState.pos, target.pos, 0x8a5aff);
+    if(skill.type==='ranged_single'){
+      spawnCastBolt(playerState.pos, target.pos, 0x8a5aff);
+      if(target.hp > 0) applyChill(target, 2.5); // 원거리 스킬: 적중한 대상을 얼려 이동/공격 속도 저하
+    }
     SFX.crit();
     if(target.hp <= 0) killMonster(target);
   } else if(isAoe){
@@ -2048,7 +2051,9 @@ function useClassSkill(slotKey){
       spawnDamageNumberAt(wp, dmg, isCrit, '#4ad0ff');
       updateMonsterBar(m);
       checkBossPhaseTransition(m);
-      if(m.hp <= 0) killMonster(m);
+      if(m.hp <= 0){ killMonster(m); }
+      else if(skill.type==='melee_aoe') applyBurn(m, Math.max(1,Math.round(stats.atk*0.15)), 4, 0.8); // 근접 광역: 화상 지속피해
+      else if(skill.type==='ranged_aoe') applyChill(m, 2); // 원거리 광역: 범위 빙결
     });
     flashSkillEffect(center, 0x4ad0ff, radius);
     if(skill.type==='ranged_aoe') spawnCastBolt(playerState.pos, center, 0x8a5aff);
@@ -4671,6 +4676,7 @@ function playerAttack(monster){
 }
 
 function killMonster(monster){
+  if(isChilled(monster)) triggerFrostNova(monster);
   monster.alive = false;
   SFX.monsterDeath();
   const dropX = monster.pos.x, dropZ = monster.pos.z;
@@ -4753,6 +4759,69 @@ function forceGoodItem(){
 
 function updateMonsterBar(m){
   m.barFill.style.width = Math.max(0,(m.hp/m.maxHp*100))+'%';
+}
+
+/* ---------------------------- 상태이상 (빙결 / 화상) ---------------------------- */
+// 원거리 계열 스킬은 적을 얼려 이동/공격 속도를 늦추고, 근접 광역 스킬은 화상을 입혀 지속 피해를 준다.
+// 얼어붙은 적을 처치하면 주변에 냉기가 폭발해 추가 피해를 준다 - 스킬과 상태이상이 맞물려 새로운 전투 리듬을 만든다.
+const CHILL_SPEED_MULT = 0.45;
+function applyChill(m, durationSec){
+  if(!m || !m.alive) return;
+  m.chillUntil = performance.now() + durationSec*1000;
+  if(!m.chillFx){
+    const ring = new THREE.Mesh(new THREE.RingGeometry(0.3,0.42,16), new THREE.MeshBasicMaterial({color:0x8ad8ff, transparent:true, opacity:0.7, side:THREE.DoubleSide}));
+    ring.rotation.x = -Math.PI/2; ring.position.y = 0.1;
+    m.mesh.add(ring);
+    m.chillFx = ring;
+  }
+}
+function isChilled(m){ return !!(m.chillUntil && performance.now() < m.chillUntil); }
+function applyBurn(m, dmgPerTick, ticks, tickInterval){
+  if(!m || !m.alive) return;
+  m.burnTicksLeft = ticks;
+  m.burnDmgPerTick = dmgPerTick;
+  m.burnTickInterval = tickInterval || 0.8;
+  if(m.burnTimer === undefined) m.burnTimer = 0;
+}
+function updateStatusEffects(m, dt){
+  if(m.chillUntil){
+    if(performance.now() >= m.chillUntil){
+      m.chillUntil = null;
+      if(m.chillFx){ m.mesh.remove(m.chillFx); m.chillFx = null; }
+    }
+  }
+  if(m.burnTicksLeft > 0){
+    m.burnTimer -= dt;
+    if(m.burnTimer <= 0){
+      m.burnTimer = m.burnTickInterval;
+      m.burnTicksLeft--;
+      m.hp -= m.burnDmgPerTick;
+      const wp = m.pos.clone(); wp.y = 1.8*m.def.scale;
+      spawnDamageNumberAt(wp, m.burnDmgPerTick, false, '#ff8a4a');
+      updateMonsterBar(m);
+      checkBossPhaseTransition(m);
+      if(m.hp <= 0) killMonster(m);
+    }
+  }
+}
+// 얼어붙은 적을 처치하면 주변 적들에게 냉기 폭발 피해
+function triggerFrostNova(monster){
+  const stats = getTotalStats();
+  const radius = 3.2;
+  const nearby = monsters.filter(m2=>m2.alive && m2!==monster && monster.pos.distanceTo(m2.pos) < radius);
+  if(nearby.length === 0) return;
+  flashSkillEffect(monster.pos, 0x8ad8ff, radius);
+  SFX.crit();
+  nearby.forEach(m2=>{
+    const dmg = Math.max(1, Math.round(stats.atk*0.6));
+    m2.hp -= dmg;
+    const wp = m2.pos.clone(); wp.y = 2.0*m2.def.scale;
+    spawnDamageNumberAt(wp, dmg, false, '#8ad8ff');
+    updateMonsterBar(m2);
+    checkBossPhaseTransition(m2);
+    applyChill(m2, 2);
+    if(m2.hp <= 0) killMonster(m2);
+  });
 }
 
 /* ---------------------------- 보스 페이즈 ---------------------------- */
@@ -4998,6 +5067,8 @@ function facePosition(target){
 function updateMonsters(dt){
   for(const m of monsters){
     if(!m.alive) continue;
+    updateStatusEffects(m, dt);
+    const spd = m.def.speed * (isChilled(m) ? CHILL_SPEED_MULT : 1);
     const distToPlayer = m.pos.distanceTo(playerState.pos);
 
     if(m.def.isBoss && !bossWarned && distToPlayer < 20){
@@ -5019,12 +5090,12 @@ function updateMonsters(dt){
       const dist = dir.length();
       if(dist > m.def.range){
         dir.normalize();
-        const step = Math.min(dist-m.def.range+1, m.def.speed*dt);
+        const step = Math.min(dist-m.def.range+1, spd*dt);
         if(step>0){ const nx=m.pos.x+dir.x*step, nz=m.pos.z+dir.z*step; if(!collides(nx,nz,0.5*m.def.scale)){ m.pos.x=nx; m.pos.z=nz; } }
         m.mesh.rotation.y = Math.atan2(dir.x,dir.z);
       } else if(dist < m.def.minRange){
         dir.normalize();
-        const step = Math.min(m.def.minRange-dist, m.def.speed*dt);
+        const step = Math.min(m.def.minRange-dist, spd*dt);
         const nx=m.pos.x-dir.x*step, nz=m.pos.z-dir.z*step;
         if(!collides(nx,nz,0.5*m.def.scale)){ m.pos.x=nx; m.pos.z=nz; }
         m.mesh.rotation.y = Math.atan2(dir.x,dir.z);
@@ -5033,14 +5104,14 @@ function updateMonsters(dt){
         m.attackCooldown -= dt;
         if(m.attackCooldown <= 0){
           monsterShootProjectile(m);
-          m.attackCooldown = 1.7*(m.phaseCdMult||1);
+          m.attackCooldown = 1.7*(m.phaseCdMult||1)/(isChilled(m)?CHILL_SPEED_MULT:1);
         }
       }
     } else if(m.state === 'chase' && player.alive){
       if(distToPlayer > 1.8){
         const dir = new THREE.Vector3().subVectors(playerState.pos, m.pos); dir.y=0;
         const dist = dir.length(); dir.normalize();
-        const step = Math.min(dist-1.6, m.def.speed*dt);
+        const step = Math.min(dist-1.6, spd*dt);
         if(step>0){
           const nx = m.pos.x+dir.x*step, nz = m.pos.z+dir.z*step;
           if(!collides(nx,nz,0.5*m.def.scale)){ m.pos.x=nx; m.pos.z=nz; }
@@ -5050,14 +5121,14 @@ function updateMonsters(dt){
         m.attackCooldown -= dt;
         if(m.attackCooldown <= 0){
           monsterAttackPlayer(m);
-          m.attackCooldown = 1.1*(m.phaseCdMult||1);
+          m.attackCooldown = 1.1*(m.phaseCdMult||1)/(isChilled(m)?CHILL_SPEED_MULT:1);
         }
       }
     } else if(m.state === 'return'){
       const dir = new THREE.Vector3().subVectors(m.home, m.pos); dir.y=0;
       const dist = dir.length();
       if(dist < 0.3){ m.state='idle'; }
-      else { dir.normalize(); const step=Math.min(dist,m.def.speed*dt); m.pos.x+=dir.x*step; m.pos.z+=dir.z*step; }
+      else { dir.normalize(); const step=Math.min(dist,spd*dt); m.pos.x+=dir.x*step; m.pos.z+=dir.z*step; }
     } else {
       // idle wander
       m.wanderTimer -= dt;
