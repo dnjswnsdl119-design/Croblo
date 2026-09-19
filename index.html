@@ -284,6 +284,18 @@
   #confirm-actions button:hover{background:#332b1e;}
   #confirm-yes{color:#ff8080;}
 
+  /* ---------- 성장무기 경로 선택 팝업 ---------- */
+  #growth-path-modal{position:absolute;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:96;}
+  #growth-path-modal.hidden{display:none;}
+  #growth-path-box{background:var(--panel-bg);border:2px solid #ffd84a;border-radius:10px;padding:22px 26px;max-width:420px;color:#eee;text-align:center;}
+  #growth-path-title{font-size:16px;font-weight:bold;color:#ffd84a;margin-bottom:8px;}
+  #growth-path-desc{font-size:12px;color:#bbb;margin-bottom:16px;line-height:1.5;}
+  #growth-path-options{display:flex;flex-direction:column;gap:10px;}
+  .growth-path-opt{padding:12px;border-radius:8px;border:1px solid var(--panel-border);background:#221d15;color:#eee;cursor:pointer;text-align:left;}
+  .growth-path-opt:hover{background:#332b1e;border-color:#ffd84a;}
+  .growth-path-opt-name{font-weight:bold;color:#ffd84a;font-size:13px;margin-bottom:3px;}
+  .growth-path-opt-desc{font-size:11px;color:#aaa;}
+
   /* ---------- HP/MP 오브 (하단 중앙) ---------- */
   #orb-row{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:36px;align-items:center;pointer-events:none;}
   .orb{position:relative;width:64px;height:64px;border-radius:50%;border:3px solid #4a3a1a;background:#161210;overflow:hidden;box-shadow:0 0 10px rgba(0,0,0,0.7), inset 0 0 8px rgba(0,0,0,0.6);}
@@ -580,6 +592,14 @@
     </div>
   </div>
 
+  <div id="growth-path-modal" class="hidden">
+    <div id="growth-path-box">
+      <div id="growth-path-title">성장무기 각성 - 경로 선택</div>
+      <div id="growth-path-desc">무기가 3단계에 도달해 각성할 준비가 되었습니다. 하나의 각인을 선택하면 이후 변경할 수 없습니다.</div>
+      <div id="growth-path-options"></div>
+    </div>
+  </div>
+
   <button id="btn-reset-save" title="저장 데이터 초기화">🔄</button>
 
   <div id="class-select-screen" class="hidden">
@@ -618,6 +638,7 @@ const RARITY = {
   fusion:  { key:'fusion',  label:'각인석', color:'#ffb347', mult:1.0,  weight:0   },
   material:{ key:'material',label:'재료',   color:'#a0a0a0', mult:1.0,  weight:0   },
   crafted: { key:'crafted', label:'제작',   color:'#6adfff', mult:2.1,  weight:0   },
+  growth:  { key:'growth',  label:'성장무기', color:'#ffd84a', mult:1.0,  weight:0   },
 };
 
 const SLOT_LABEL = { weapon:'무기', armor:'방어구', accessory:'장신구', helmet:'투구', gloves:'장갑', boots:'신발', belt:'벨트', rune:'룬', gem:'보석', fusion:'각인석', material:'재료' };
@@ -979,6 +1000,91 @@ function checkRuneword(item){
   }
 }
 
+/* ---------------------------- 성장무기 ---------------------------- */
+// 캐릭터와 함께 성장하는 특수 무기: 몬스터를 처치할 때마다 별도의 성장 경험치를 얻어 레벨업하고,
+// 특정 레벨에서 단계가 진화(외형/능력치 곡선 변화)하며, 3단계 진입 시 영구적인 각성 경로를 하나 선택한다.
+const GROWTH_WEAPON_STAGES = [
+  { stage:1, minLevel:1,  name:'여명의 성장검', atkPerLevel:0.9, hpPerLevel:2.5, color:0x9fa8b0, glow:0.25 },
+  { stage:2, minLevel:10, name:'각성한 여명검', atkPerLevel:1.3, hpPerLevel:3.5, color:0x4a9eff, glow:0.5 },
+  { stage:3, minLevel:20, name:'혼이 깃든 여명검', atkPerLevel:1.8, hpPerLevel:5,  color:0xc77dff, glow:0.75 },
+  { stage:4, minLevel:30, name:'신화의 여명검', atkPerLevel:2.5, hpPerLevel:7,  color:0xffd84a, glow:1.0 },
+];
+const GROWTH_PATH_UNLOCK_LEVEL = 20;
+const GROWTH_PATHS = {
+  blood: { id:'blood', name:'피의 각인', desc:'공격 시 가한 피해의 일부를 체력으로 흡수합니다.', lifesteal:0.06 },
+  storm: { id:'storm', name:'폭풍의 각인', desc:'공격 속도가 크게 빨라지고 치명타 확률이 오릅니다.', atkSpeedMult:0.78, critBonus:8 },
+  titan: { id:'titan', name:'거인의 각인', desc:'방어력과 체력이 크게 오르고 받는 피해가 추가로 줄어듭니다.', defBonus:16, hpBonus:60, dr:0.08 },
+};
+function getGrowthStageDef(stage){ return GROWTH_WEAPON_STAGES.find(s=>s.stage===stage) || GROWTH_WEAPON_STAGES[0]; }
+function updateGrowthWeaponName(w){
+  const stageDef = getGrowthStageDef(w.growthStage);
+  w.name = stageDef.name + (w.growthPath ? ` · ${GROWTH_PATHS[w.growthPath].name}` : '');
+}
+function createGrowthWeapon(){
+  const w = {
+    uid: itemUid++, slot:'weapon', rarity:'growth', base:{atk:6}, enhance:0, sockets:0, runes:[],
+    isGrowthWeapon:true, growthLevel:1, growthXp:0, growthXpToNext:40, growthStage:1, growthPath:null,
+    flavor:'주인과 함께 성장하는 무기. 몬스터를 처치할 때마다 미약하게 진동한다.',
+  };
+  updateGrowthWeaponName(w);
+  return w;
+}
+function openGrowthPathModal(w){
+  const modal = document.getElementById('growth-path-modal');
+  const opts = document.getElementById('growth-path-options');
+  opts.innerHTML = Object.values(GROWTH_PATHS).map(p=>
+    `<button class="growth-path-opt" data-path="${p.id}"><div class="growth-path-opt-name">${p.name}</div><div class="growth-path-opt-desc">${p.desc}</div></button>`
+  ).join('');
+  modal.classList.remove('hidden');
+  opts.querySelectorAll('.growth-path-opt').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      w.growthPath = btn.dataset.path;
+      updateGrowthWeaponName(w);
+      modal.classList.add('hidden');
+      spawnToast(`각성 완료: ${GROWTH_PATHS[w.growthPath].name}!`, '#ffd84a');
+      SFX.enhanceSuccess();
+      refreshHUD(); refreshInventoryIfOpen(); updateWeaponVisual(); saveGame(true);
+    }, { once:true });
+  });
+}
+function addGrowthWeaponXP(amount){
+  const w = player.equipment.weapon;
+  if(!w || !w.isGrowthWeapon) return;
+  w.growthXp += amount;
+  let leveledUp = false;
+  while(w.growthXp >= w.growthXpToNext){
+    w.growthXp -= w.growthXpToNext;
+    w.growthLevel++;
+    w.growthXpToNext = Math.round(w.growthXpToNext*1.22);
+    leveledUp = true;
+    const newStage = [...GROWTH_WEAPON_STAGES].reverse().find(s=>w.growthLevel>=s.minLevel).stage;
+    if(newStage !== w.growthStage){
+      w.growthStage = newStage;
+      updateGrowthWeaponName(w);
+      spawnToast(`✨ 성장무기 진화! ${getGrowthStageDef(newStage).name} (${newStage}단계)`, '#ffd84a');
+      SFX.enhanceSuccess();
+      updateWeaponVisual();
+    }
+  }
+  if(leveledUp){
+    spawnToast(`성장무기 레벨업! Lv.${w.growthLevel}`, '#8ad8ff');
+    refreshHUD(); refreshInventoryIfOpen(); saveGame(true);
+    if(w.growthLevel >= GROWTH_PATH_UNLOCK_LEVEL && !w.growthPath) openGrowthPathModal(w);
+  }
+}
+// 성장무기의 레벨 비례 능력치(공격력/체력) + 각성 경로 고정 보너스를 총 스탯에 더한다
+function applyGrowthWeaponStats(w, stats){
+  const stageDef = getGrowthStageDef(w.growthStage);
+  stats.atk += Math.round(stageDef.atkPerLevel * w.growthLevel);
+  stats.hp += Math.round(stageDef.hpPerLevel * w.growthLevel);
+  if(w.growthPath === 'titan'){
+    const p = GROWTH_PATHS.titan;
+    stats.def += p.defBonus; stats.hp += p.hpBonus;
+  } else if(w.growthPath === 'storm'){
+    stats.crit += GROWTH_PATHS.storm.critBonus;
+  }
+}
+
 function createRuneItem(runeId){
   const r = RUNES[runeId];
   return { uid:itemUid++, name:r.name, slot:'rune', rarity:'rune', runeId, base:{}, enhance:0 };
@@ -1076,7 +1182,15 @@ const SOCKETABLE_SLOTS = ['rune','gem','fusion','material'];
 function computeItemPower(item){
   if(!item || SOCKETABLE_SLOTS.includes(item.slot)) return 0;
   const s = getScaledStats(item);
-  return (s.atk||0)*2 + (s.def||0)*2 + (s.hp||0)*0.3 + (s.crit||0)*3;
+  let power = (s.atk||0)*2 + (s.def||0)*2 + (s.hp||0)*0.3 + (s.crit||0)*3;
+  if(item.isGrowthWeapon){
+    // 성장무기는 레벨/각성 경로 보너스까지 반영해야 정확한 비교가 된다 (그래야 새 드랍템에 밀려나지 않음)
+    const growthStats = { atk:0, def:0, hp:0, crit:0 };
+    applyGrowthWeaponStats(item, growthStats);
+    power += growthStats.atk*2 + growthStats.def*2 + growthStats.hp*0.3 + growthStats.crit*3;
+    power += 500; // 성장무기는 장기 투자 가치가 있으므로 웬만한 파밍템에 밀려나지 않도록 가산점
+  }
+  return power;
 }
 
 // 파밍한 아이템이 현재 장착 중인 같은 부위 장비보다 강한지 (즉시 장착 추천 여부)
@@ -1113,6 +1227,7 @@ const player = {
   enhanceStones:0,
   hasDungeonKey:false,
   hasAbyssKey:false,
+  hasGrowthWeapon:false,
   buffs: { atkMult:1, defMult:1, dmgReduction:0, speedMult:1 },
   buffTimers: { atk:0, def:0, dmgReduction:0, speed:0 },
   baseMp:50, mp:50,
@@ -1304,6 +1419,7 @@ function getTotalStats(){
       const rw = RUNEWORDS.find(r=>r.id===item.activeRuneword);
       if(rw){ stats.atk += rw.bonus.atk||0; stats.def += rw.bonus.def||0; stats.hp += rw.bonus.hp||0; stats.crit += rw.bonus.crit||0; }
     }
+    if(item.isGrowthWeapon) applyGrowthWeaponStats(item, stats);
   }
   const setCounts = {};
   for(const slot in player.equipment){
@@ -1690,7 +1806,24 @@ function getMoveSpeed(){
 }
 
 function getDamageReduction(){
-  return player.buffTimers.dmgReduction > 0 ? player.buffs.dmgReduction : 0;
+  let dr = player.buffTimers.dmgReduction > 0 ? player.buffs.dmgReduction : 0;
+  const w = player.equipment.weapon;
+  if(w && w.isGrowthWeapon && w.growthPath === 'titan') dr += GROWTH_PATHS.titan.dr;
+  return Math.min(0.85, dr);
+}
+// 성장무기 "피의 각인" 경로: 가한 피해의 일부를 체력으로 흡수
+function applyGrowthLifesteal(dmg){
+  const w = player.equipment.weapon;
+  if(!w || !w.isGrowthWeapon || w.growthPath !== 'blood' || dmg<=0) return;
+  const heal = Math.round(dmg * GROWTH_PATHS.blood.lifesteal);
+  if(heal <= 0) return;
+  player.hp = Math.min(getTotalStats().hp, player.hp + heal);
+  refreshHUD();
+}
+// 성장무기 "폭풍의 각인" 경로: 기본공격/스킬 재사용시간을 단축
+function getGrowthAtkSpeedMult(){
+  const w = player.equipment.weapon;
+  return (w && w.isGrowthWeapon && w.growthPath === 'storm') ? GROWTH_PATHS.storm.atkSpeedMult : 1;
 }
 
 function toggleMount(){
@@ -1860,7 +1993,7 @@ function useClassSkill(slotKey){
   }
 
   if(playerState.mounted) toggleMount();
-  state.cd = skill.cdMax * scale.cd;
+  state.cd = skill.cdMax * scale.cd * getGrowthAtkSpeedMult();
   player.mp = Math.max(0, player.mp - cost);
   const stats = getTotalStats();
   const mult = (skill.mult||0) * scale.power;
@@ -1870,6 +2003,7 @@ function useClassSkill(slotKey){
     let dmg = Math.max(1, Math.round(stats.atk*mult*rand(0.9,1.1) - target.def.def*0.5*getDefPenetration()));
     if(isCrit) dmg = Math.round(dmg*1.8);
     target.hp -= dmg;
+    applyGrowthLifesteal(dmg);
     const wp = target.pos.clone(); wp.y = 2.2*target.def.scale;
     spawnDamageNumberAt(wp, dmg, true, '#ff8a2a');
     updateMonsterBar(target);
@@ -1888,6 +2022,7 @@ function useClassSkill(slotKey){
       let dmg = Math.max(1, Math.round(stats.atk*mult*rand(0.9,1.1) - m.def.def*0.5*getDefPenetration()));
       if(isCrit) dmg = Math.round(dmg*1.8);
       m.hp -= dmg;
+      applyGrowthLifesteal(dmg);
       const wp = m.pos.clone(); wp.y = 2.0*m.def.scale;
       spawnDamageNumberAt(wp, dmg, isCrit, '#4ad0ff');
       updateMonsterBar(m);
@@ -1934,8 +2069,9 @@ function useBasicAttackHotkey(){
   playerState.targetMonster = target;
   if(playerState.mounted) toggleMount();
   facePosition(target.pos);
-  basicAttackState.cd = basicAttackState.cdMax;
-  playerState.attackCooldown = basicAttackState.cdMax;
+  const cd = basicAttackState.cdMax * getGrowthAtkSpeedMult();
+  basicAttackState.cd = cd;
+  playerState.attackCooldown = cd;
   playerAttack(target);
 }
 
@@ -2030,6 +2166,15 @@ function updateWeaponVisual(){
   const tints = mesh.userData.tintMeshes || [mesh];
   if(!w){
     tints.forEach(m=>{ m.material.color.set(0xdddddd); m.material.emissive.set(0x000000); });
+    return;
+  }
+  if(w.isGrowthWeapon){
+    const stageDef = getGrowthStageDef(w.growthStage);
+    const c = new THREE.Color(stageDef.color);
+    tints.forEach(m=>{
+      m.material.color.set(c);
+      m.material.emissive.set(c); m.material.emissiveIntensity = stageDef.glow;
+    });
     return;
   }
   const c = new THREE.Color(RARITY[w.rarity].color);
@@ -4374,6 +4519,7 @@ function playerAttack(monster){
   let realDmg = Math.max(1, Math.round(stats.atk*rand(0.85,1.15) - monster.def.def*0.5*getDefPenetration()));
   if(isCrit) realDmg = Math.round(realDmg*1.8);
   monster.hp -= realDmg;
+  applyGrowthLifesteal(realDmg);
   const worldPos = monster.pos.clone(); worldPos.y = 2.0*monster.def.scale;
   spawnDamageNumberAt(worldPos, realDmg, isCrit);
   updateMonsterBar(monster);
@@ -4398,6 +4544,7 @@ function killMonster(monster){
   // 몬스터가 내 레벨보다 높을수록 경험치/골드 보상이 늘고, 훨씬 낮으면 보상이 줄어든다
   const rewardMult = clamp(1 + (mLevel - player.level)*0.12, 0.5, 2.5);
   addXP(Math.max(1, Math.round(monster.def.xp * rewardMult)));
+  addGrowthWeaponXP(Math.max(1, Math.round(monster.def.xp * 0.7 * rewardMult)));
   if(!player.discoveredMonsters.includes(monster.type)) player.discoveredMonsters.push(monster.type);
   const gold = Math.max(1, Math.round(randi(monster.def.goldMin, monster.def.goldMax) * rewardMult));
   spawnGoldPickup(gold, dropX, dropZ);
@@ -4431,6 +4578,18 @@ function killMonster(monster){
   if(monster.type === 'chief' && !player.hasDungeonKey){
     player.hasDungeonKey = true;
     spawnToast('오크 소굴 열쇠 획득! 이제 던전에 입장할 수 있습니다', '#c9a0ff');
+  }
+  if(monster.def.isBoss && !player.hasGrowthWeapon){
+    player.hasGrowthWeapon = true;
+    const gw = createGrowthWeapon();
+    if(!player.equipment.weapon){
+      player.equipment.weapon = gw; // 무기 슬롯이 비어있으면 바로 장착
+    } else if(!addItemToInventory(gw)){
+      player.inventory.push(gw); // 인벤토리가 가득 찼어도 성장무기는 반드시 지급
+    }
+    spawnToast(`✨ 성장무기 발견: ${gw.name}! 몬스터를 처치하며 함께 성장합니다.`, '#ffd84a');
+    SFX.enhanceSuccess();
+    refreshInventoryIfOpen(); refreshHUD(); updateWeaponVisual();
   }
   if(monster.type === 'orclord' && !player.hasAbyssKey){
     player.hasAbyssKey = true;
@@ -4623,7 +4782,7 @@ function updatePlayer(dt){
       playerState.attackCooldown -= dt;
       if(playerState.attackCooldown <= 0){
         playerAttack(t);
-        playerState.attackCooldown = 0.7;
+        playerState.attackCooldown = 0.7 * getGrowthAtkSpeedMult();
       }
     }
   } else if(playerState.moveTarget){
@@ -4994,7 +5153,7 @@ function saveGame(force){
     baseHp: player.baseHp, baseAtk: player.baseAtk, baseDef: player.baseDef, baseCrit: player.baseCrit,
     baseMp: player.baseMp, rebirths: player.rebirths,
     gold: player.gold, potions: player.potions, enhanceStones: player.enhanceStones,
-    hasDungeonKey: player.hasDungeonKey, hasAbyssKey: player.hasAbyssKey,
+    hasDungeonKey: player.hasDungeonKey, hasAbyssKey: player.hasAbyssKey, hasGrowthWeapon: player.hasGrowthWeapon,
     inventory: player.inventory,
     equipment: player.equipment,
     quests: player.quests,
@@ -5024,6 +5183,7 @@ function loadGame(){
     player.gold = data.gold||0; player.potions = data.potions||0; player.enhanceStones = data.enhanceStones||0;
     player.hasDungeonKey = !!data.hasDungeonKey;
     player.hasAbyssKey = !!data.hasAbyssKey;
+    player.hasGrowthWeapon = !!data.hasGrowthWeapon;
     player.inventory = data.inventory || [];
     player.equipment = Object.assign(
       { weapon:null, armor:null, accessory:null, helmet:null, gloves:null, boots:null, belt:null },
@@ -5294,6 +5454,17 @@ function itemStatsText(item){
   if(item.skillBonus){
     html += `<br><span style="color:#ff8ccf;">${SKILL_BONUS_LABEL[item.skillBonus.key]} 스킬 랭크 +${item.skillBonus.rank}</span>`;
   }
+  if(item.isGrowthWeapon){
+    const stageDef = getGrowthStageDef(item.growthStage);
+    const growthStats = { atk:0, def:0, hp:0, crit:0 };
+    applyGrowthWeaponStats(item, growthStats);
+    const growthText = Object.entries(growthStats).filter(([,v])=>v).map(([k,v])=>`${labels[k]||k} +${v}${k==='crit'?'%':''}`).join(' · ');
+    html += `<br><span style="color:#ffd84a;">🌱 성장무기 ${item.growthStage}단계 · Lv.${item.growthLevel} (${item.growthXp}/${item.growthXpToNext})</span>`;
+    html += `<br><span style="color:#ffe9a8;font-size:10px;">성장 보너스: ${growthText}</span>`;
+    html += item.growthPath
+      ? `<br><span style="color:#ff9ac2;font-size:10px;">각성: ${GROWTH_PATHS[item.growthPath].name} - ${GROWTH_PATHS[item.growthPath].desc}</span>`
+      : `<br><span style="color:#888;font-size:10px;">각성 미선택 (Lv.${GROWTH_PATH_UNLOCK_LEVEL}에 선택 가능)</span>`;
+  }
   return html;
 }
 
@@ -5464,10 +5635,10 @@ function renderDetail(){
   equipBtn.textContent = itemIsUpgrade ? '⬆ 즉시 장착' : '장착';
   document.getElementById('btn-unequip').style.display = isEquipped ? 'inline-block':'none';
   const disBtn = document.getElementById('btn-disassemble');
-  disBtn.style.display = (isEquipped || isSocketable) ? 'none' : 'inline-block';
+  disBtn.style.display = (isEquipped || isSocketable || item.isGrowthWeapon) ? 'none' : 'inline-block';
   disBtn.textContent = `🔨 분해 (강화석 +${DISASSEMBLE_YIELD[item.rarity]||1})`;
   const sellBtn = document.getElementById('btn-sell');
-  sellBtn.style.display = isEquipped ? 'none' : 'inline-block';
+  sellBtn.style.display = (isEquipped || item.isGrowthWeapon) ? 'none' : 'inline-block';
   sellBtn.textContent = `🪙 판매 (${getSellValue(item)}G)`;
 
   // 강화 정보 (룬/보석은 강화 불가)
@@ -5661,6 +5832,7 @@ document.getElementById('btn-enhance').addEventListener('click', ()=>{
 document.getElementById('btn-disassemble').addEventListener('click', ()=>{
   if(!selectedItem || selectedItem.from!=='inv') return;
   const item = selectedItem.item;
+  if(item.isGrowthWeapon) return; // 성장무기는 절대 분해할 수 없음
   const yield_ = DISASSEMBLE_YIELD[item.rarity]||1;
   player.inventory = player.inventory.filter(i=>i.uid!==item.uid);
   player.enhanceStones += yield_;
@@ -5672,6 +5844,7 @@ document.getElementById('btn-disassemble').addEventListener('click', ()=>{
 document.getElementById('btn-sell').addEventListener('click', ()=>{
   if(!selectedItem || selectedItem.from!=='inv') return;
   const item = selectedItem.item;
+  if(item.isGrowthWeapon) return; // 성장무기는 절대 판매할 수 없음
   const value = getSellValue(item);
   player.inventory = player.inventory.filter(i=>i.uid!==item.uid);
   addGold(value);
