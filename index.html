@@ -63,8 +63,9 @@
   #inv-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-bottom:1px solid var(--panel-border);padding-bottom:8px;gap:10px;flex-shrink:0;}
   #inv-header h2{margin:0;font-size:16px;color:var(--gold);flex:1;}
   #inv-header h2 .inv-count{color:#999;font-size:12px;font-weight:normal;margin-left:6px;}
-  #btn-sell-junk{padding:6px 10px;border-radius:5px;border:1px solid var(--panel-border);background:#221d15;color:var(--gold);cursor:pointer;font-size:11px;}
+  #btn-sell-junk{padding:6px 10px;border-radius:5px;border:1px solid var(--panel-border);background:#221d15;color:var(--gold);cursor:pointer;font-size:11px;white-space:nowrap;}
   #btn-sell-junk:hover{background:#332b1e;}
+  #junk-threshold-select{padding:6px 6px;border-radius:5px;border:1px solid var(--panel-border);background:#1a1712;color:#ccc;font-size:11px;cursor:pointer;}
   #inv-close{cursor:pointer;color:#aaa;font-size:18px;background:none;border:none;}
   #inv-body{display:flex;gap:18px;min-height:0;flex:1;}
   #equip-column{width:160px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
@@ -87,6 +88,10 @@
   .inv-slot .slot-icon{position:absolute;top:2px;left:3px;font-size:10px;opacity:0.55;}
   .inv-slot .item-name-small{color:inherit;}
   .inv-slot .enh-badge{position:absolute;top:1px;right:2px;font-size:9px;color:var(--gold);font-weight:bold;}
+  .inv-slot.upgrade{box-shadow:0 0 8px rgba(92,255,138,0.55);}
+  .inv-slot.upgrade:hover{box-shadow:0 0 12px rgba(92,255,138,0.8);}
+  .upgrade-badge{position:absolute;bottom:1px;right:1px;width:16px;height:16px;border-radius:50%;background:#1a3d24;border:1px solid #5cff8a;color:#5cff8a;font-size:10px;line-height:14px;padding:0;cursor:pointer;animation:upgradePulse 1.4s ease-in-out infinite;}
+  @keyframes upgradePulse{0%,100%{transform:scale(1);}50%{transform:scale(1.18);}}
   #char-stats{margin-top:12px;padding-top:10px;border-top:1px solid var(--panel-border);font-size:12px;line-height:1.7;display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;}
 
   /* ---------- detail / enhancement panel ---------- */
@@ -95,6 +100,9 @@
   #detail-content{display:none;}
   #detail-name{font-size:14px;font-weight:bold;margin-bottom:2px;}
   #detail-type{font-size:11px;color:#999;margin-bottom:8px;}
+  #detail-upgrade-hint{font-size:11px;color:#5cff8a;font-weight:bold;margin:-4px 0 8px;}
+  #detail-upgrade-hint.hidden{display:none;}
+  #btn-equip.upgrade{border-color:#5cff8a;color:#5cff8a;background:rgba(92,255,138,0.1);animation:upgradePulse 1.4s ease-in-out infinite;}
   #detail-stats{font-size:12px;line-height:1.7;color:#bde0bd;}
   #detail-set-info{font-size:11px;color:var(--rarity-set);margin-top:6px;line-height:1.5;}
   #socket-info{margin-top:8px;font-size:11px;color:#c77dff;}
@@ -410,7 +418,8 @@
   <div id="inventory-panel" class="panel hidden">
     <div id="inv-header">
       <h2>인벤토리 & 장비</h2>
-      <button id="btn-sell-junk" title="일반 등급 아이템 전체 판매">🪙 잡템 정리</button>
+      <select id="junk-threshold-select" title="잡템 기준 등급 선택"></select>
+      <button id="btn-sell-junk">🪙 잡템 정리</button>
       <button id="inv-close">✕</button>
     </div>
     <div id="inv-body">
@@ -431,6 +440,7 @@
           <div id="detail-content">
             <div id="detail-name"></div>
             <div id="detail-type"></div>
+            <div id="detail-upgrade-hint" class="hidden">⬆ 장착 중인 장비보다 강합니다!</div>
             <div id="detail-stats"></div>
             <div id="detail-set-info"></div>
             <div id="socket-info"></div>
@@ -798,6 +808,21 @@ function getScaledStats(item){
   return out;
 }
 
+// 장비 비교용 대략적인 "전투력" 점수: 서로 다른 스탯 구성의 장비를 대충 비교하기 위한 가중합
+function computeItemPower(item){
+  if(!item || item.slot === 'rune') return 0;
+  const s = getScaledStats(item);
+  return (s.atk||0)*2 + (s.def||0)*2 + (s.hp||0)*0.3 + (s.crit||0)*3;
+}
+
+// 파밍한 아이템이 현재 장착 중인 같은 부위 장비보다 강한지 (즉시 장착 추천 여부)
+function isUpgrade(item){
+  if(!item || item.slot === 'rune') return false;
+  const equipped = player.equipment[item.slot];
+  if(!equipped) return true;
+  return computeItemPower(item) > computeItemPower(equipped);
+}
+
 function enhanceChance(level){
   if(level < 5) return 0.95;
   if(level < 8) return 0.80;
@@ -831,7 +856,9 @@ const player = {
   discoveredMonsters:[],
   statPoints:0,
   allocatedStats:{ str:0, agi:0, int:0, vit:0 },
+  junkThreshold:'magic',
 };
+const JUNK_RARITY_OPTIONS = ['normal','magic','rare','set'];
 const STAT_ALLOC_INFO = {
   str:{ label:'힘 (STR)', desc:'공격력 +1' },
   agi:{ label:'민첩 (AGI)', desc:'치명타 +0.3%' },
@@ -969,12 +996,25 @@ function addXP(amount){
 function addGold(amount){ player.gold += amount; refreshHUD(); }
 
 let lastInvFullToast = 0;
+let lastJunkPromptTime = -Infinity;
+let junkPromptOpen = false;
 function warnInventoryFull(){
   const now = performance.now();
   if(now - lastInvFullToast > 4000){
     lastInvFullToast = now;
     spawnToast('인벤토리가 가득 찼습니다', '#888');
   }
+  if(junkPromptOpen || now - lastJunkPromptTime < 20000) return;
+  if(invPanel && !invPanel.classList.contains('hidden')) return;
+  const maxTier = RARITY_TIER[player.junkThreshold];
+  const junkCount = player.inventory.filter(i=>RARITY_TIER[i.rarity] !== undefined && RARITY_TIER[i.rarity] <= maxTier).length;
+  if(junkCount === 0) return;
+  lastJunkPromptTime = now;
+  junkPromptOpen = true;
+  showConfirm(`인벤토리가 가득 찼습니다. ${RARITY[player.junkThreshold].label} 등급 이하 잡템 ${junkCount}개를 지금 정리할까요?`, ()=>{
+    junkPromptOpen = false;
+    sellJunkItems();
+  }, ()=>{ junkPromptOpen = false; });
 }
 
 function addItemToInventory(item){
@@ -984,7 +1024,11 @@ function addItemToInventory(item){
   }
   player.inventory.push(item);
   const rc = RARITY[item.rarity].color;
-  spawnToast(`획득: ${item.name}`, rc);
+  if(isUpgrade(item)){
+    spawnToast(`⬆ 업그레이드! ${item.name} (인벤토리에서 즉시 장착 가능)`, '#5cff8a');
+  } else {
+    spawnToast(`획득: ${item.name}`, rc);
+  }
   SFX.pickup();
   return true;
 }
@@ -3403,6 +3447,7 @@ function saveGame(force){
     discoveredMonsters: player.discoveredMonsters,
     statPoints: player.statPoints,
     allocatedStats: player.allocatedStats,
+    junkThreshold: player.junkThreshold,
   };
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(data)); }catch(e){ /* 저장 공간 없음: 무시 */ }
 }
@@ -3431,6 +3476,7 @@ function loadGame(){
     player.discoveredMonsters = data.discoveredMonsters || [];
     player.statPoints = data.statPoints || 0;
     player.allocatedStats = Object.assign({ str:0, agi:0, int:0, vit:0 }, data.allocatedStats || {});
+    player.junkThreshold = JUNK_RARITY_OPTIONS.includes(data.junkThreshold) ? data.junkThreshold : 'magic';
     player.hp = player.baseHp;
     player.mp = player.baseMp;
 
@@ -3458,14 +3504,14 @@ if(hadSave && player.classId){
 let isResetting = false;
 window.addEventListener('beforeunload', ()=>{ if(!isResetting) saveGame(true); });
 
-function showConfirm(message, onYes){
+function showConfirm(message, onYes, onNo){
   document.getElementById('confirm-message').textContent = message;
   document.getElementById('confirm-modal').classList.remove('hidden');
   const yesBtn = document.getElementById('confirm-yes');
   const noBtn = document.getElementById('confirm-no');
   const cleanup = ()=>{ document.getElementById('confirm-modal').classList.add('hidden'); yesBtn.onclick=null; noBtn.onclick=null; };
   yesBtn.onclick = ()=>{ cleanup(); onYes(); };
-  noBtn.onclick = cleanup;
+  noBtn.onclick = ()=>{ cleanup(); if(onNo) onNo(); };
 }
 
 document.getElementById('btn-reset-save').addEventListener('click', ()=>{
@@ -3608,6 +3654,8 @@ function itemStatsText(item){
 function renderInventory(){
   const invHeader = document.querySelector('#inv-header h2');
   if(invHeader) invHeader.innerHTML = `인벤토리 & 장비<span class="inv-count">${player.inventory.length}/${MAX_INVENTORY}</span>`;
+  const junkSelectEl = document.getElementById('junk-threshold-select');
+  if(junkSelectEl && junkSelectEl.value !== player.junkThreshold) junkSelectEl.value = player.junkThreshold;
 
   // 장비 슬롯
   document.querySelectorAll('.equip-slot').forEach(slotEl=>{
@@ -3654,6 +3702,15 @@ function renderInventory(){
         badge.className = 'enh-badge';
         badge.textContent = '+'+item.enhance;
         div.appendChild(badge);
+      }
+      if(isUpgrade(item)){
+        div.classList.add('upgrade');
+        const upBadge = document.createElement('button');
+        upBadge.className = 'upgrade-badge';
+        upBadge.textContent = '⬆';
+        upBadge.title = '더 강한 장비입니다. 클릭하면 즉시 장착됩니다.';
+        upBadge.onclick = (e)=>{ e.stopPropagation(); quickEquip(item); };
+        div.appendChild(upBadge);
       }
       if(selectedItem && selectedItem.item.uid===item.uid) div.classList.add('selected');
       div.onclick = ()=> selectItem(item,'inv');
@@ -3716,7 +3773,13 @@ function renderDetail(){
   renderSocketSection(item, isRune);
 
   const isEquipped = selectedItem.from !== 'inv';
-  document.getElementById('btn-equip').style.display = (isEquipped || isRune) ? 'none':'inline-block';
+  const upgradeHint = document.getElementById('detail-upgrade-hint');
+  const itemIsUpgrade = !isEquipped && !isRune && isUpgrade(item);
+  upgradeHint.classList.toggle('hidden', !itemIsUpgrade);
+  const equipBtn = document.getElementById('btn-equip');
+  equipBtn.style.display = (isEquipped || isRune) ? 'none':'inline-block';
+  equipBtn.classList.toggle('upgrade', itemIsUpgrade);
+  equipBtn.textContent = itemIsUpgrade ? '⬆ 즉시 장착' : '장착';
   document.getElementById('btn-unequip').style.display = isEquipped ? 'inline-block':'none';
   const disBtn = document.getElementById('btn-disassemble');
   disBtn.style.display = (isEquipped || isRune) ? 'none' : 'inline-block';
@@ -3793,9 +3856,7 @@ function insertRune(targetSlot){
   renderInventory(); renderDetail(); refreshHUD();
 }
 
-document.getElementById('btn-equip').addEventListener('click', ()=>{
-  if(!selectedItem || selectedItem.from!=='inv') return;
-  const item = selectedItem.item;
+function equipItem(item){
   const slot = item.slot;
   const old = player.equipment[slot];
   player.equipment[slot] = item;
@@ -3803,6 +3864,17 @@ document.getElementById('btn-equip').addEventListener('click', ()=>{
   if(old) player.inventory.push(old);
   selectedItem = { item, from:slot };
   renderInventory(); renderDetail(); refreshHUD();
+}
+
+// 인벤토리 그리드의 업그레이드 배지 클릭 시: 상세 패널을 거치지 않고 바로 장착
+function quickEquip(item){
+  equipItem(item);
+  spawnToast(`${item.name} 즉시 장착!`, '#5cff8a');
+}
+
+document.getElementById('btn-equip').addEventListener('click', ()=>{
+  if(!selectedItem || selectedItem.from!=='inv') return;
+  equipItem(selectedItem.item);
 });
 
 document.getElementById('btn-unequip').addEventListener('click', ()=>{
@@ -3868,15 +3940,33 @@ document.getElementById('btn-sell').addEventListener('click', ()=>{
   renderInventory(); renderDetail(); refreshHUD();
 });
 
-document.getElementById('btn-sell-junk').addEventListener('click', ()=>{
-  const junk = player.inventory.filter(i=>i.rarity==='normal');
-  if(junk.length===0){ spawnToast('판매할 일반 등급 아이템이 없습니다', '#888'); return; }
+// 현재 설정된 잡템 기준(player.junkThreshold) 이하 등급 아이템을 한번에 판매
+function sellJunkItems(){
+  const maxTier = RARITY_TIER[player.junkThreshold];
+  const junk = player.inventory.filter(i=>RARITY_TIER[i.rarity] !== undefined && RARITY_TIER[i.rarity] <= maxTier);
+  if(junk.length===0){ spawnToast('판매할 잡템이 없습니다', '#888'); return 0; }
   const total = junk.reduce((sum,i)=>sum+(SELL_VALUE[i.rarity]||8),0);
-  player.inventory = player.inventory.filter(i=>i.rarity!=='normal');
+  const junkUids = new Set(junk.map(i=>i.uid));
+  player.inventory = player.inventory.filter(i=>!junkUids.has(i.uid));
   addGold(total);
-  spawnToast(`일반 아이템 ${junk.length}개 판매: +${total}G`, '#e8c66a');
+  spawnToast(`잡템 ${junk.length}개 판매: +${total}G`, '#e8c66a');
   if(selectedItem && selectedItem.from==='inv' && !player.inventory.includes(selectedItem.item)) selectedItem = null;
   renderInventory(); renderDetail(); refreshHUD();
+  return junk.length;
+}
+
+document.getElementById('btn-sell-junk').addEventListener('click', sellJunkItems);
+
+const junkSelect = document.getElementById('junk-threshold-select');
+JUNK_RARITY_OPTIONS.forEach(key=>{
+  const opt = document.createElement('option');
+  opt.value = key;
+  opt.textContent = `${RARITY[key].label} 이하`;
+  junkSelect.appendChild(opt);
+});
+junkSelect.addEventListener('change', ()=>{
+  player.junkThreshold = junkSelect.value;
+  saveGame(true);
 });
 
 document.getElementById('btn-use-stone').addEventListener('click', ()=>{
