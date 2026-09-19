@@ -238,6 +238,23 @@
   #stat-points-badge, #skill-points-badge{display:inline-block;min-width:16px;height:16px;padding:0 3px;margin-left:4px;background:#e33;color:#fff;border-radius:8px;font-size:10px;line-height:16px;text-align:center;vertical-align:middle;}
   #stat-points-badge.hidden, #skill-points-badge.hidden{display:none;}
 
+  /* ---------- 조합 패널 ---------- */
+  #combine-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:460px;max-width:92vw;max-height:82vh;overflow-y:auto;padding:16px;color:#eee;}
+  #combine-panel.hidden{display:none;}
+  #combine-tabs{display:flex;gap:6px;margin-bottom:12px;}
+  .combine-tab{flex:1;padding:7px 0;background:rgba(255,255,255,0.05);border:1px solid var(--panel-border);color:#aaa;font-size:11px;cursor:pointer;border-radius:4px;}
+  .combine-tab.active{background:rgba(255,140,207,0.15);color:#ff8ccf;border-color:#ff8ccf;}
+  .combine-row{display:flex;align-items:center;gap:10px;padding:10px;background:rgba(255,255,255,0.04);border-radius:7px;margin-bottom:8px;border:1px solid var(--panel-border);}
+  .combine-row-info{flex:1;}
+  .combine-row-name{font-size:12px;font-weight:bold;}
+  .combine-row-desc{font-size:10px;color:#999;margin-top:2px;}
+  .combine-row-btn{padding:7px 12px;border-radius:5px;border:1px solid #ff8ccf;background:rgba(255,140,207,0.12);color:#ff8ccf;cursor:pointer;font-size:11px;white-space:nowrap;}
+  .combine-row-btn:disabled{opacity:0.3;cursor:not-allowed;border-color:#555;color:#888;}
+  .combine-empty{color:#888;text-align:center;padding:20px 0;font-size:12px;}
+  #combine-fusion-pickers{display:flex;flex-direction:column;gap:8px;margin-bottom:10px;}
+  #combine-fusion-pickers select{padding:7px;border-radius:5px;border:1px solid var(--panel-border);background:#1a1712;color:#eee;font-size:12px;}
+  #combine-fusion-preview{font-size:11px;color:#bde0bd;margin-bottom:10px;min-height:16px;}
+
   /* ---------- 저장 초기화 버튼 ---------- */
   #btn-reset-save{position:absolute;top:14px;right:14px;width:34px;height:34px;border-radius:50%;background:rgba(20,16,10,0.85);border:1px solid var(--panel-border);color:#999;cursor:pointer;font-size:15px;z-index:60;}
   #btn-reset-save:hover{color:#eee;background:rgba(40,32,20,0.9);}
@@ -359,7 +376,7 @@
   <div id="toast-container"></div>
   <div id="npc-prompt">E: 대화</div>
 
-  <div id="controls-hint">WASD/방향키·클릭: 이동 · 클릭/Z: 공격 · 1/2/3/4/5: 스킬 · Space: 회피 · Q: 포션 · R: 탈것 · E: NPC 대화 · I: 인벤토리 · L: 퀘스트 · K: 도감 · C: 능력치 · V: 스킬트리</div>
+  <div id="controls-hint">WASD/방향키·클릭: 이동 · 클릭/Z: 공격 · 1/2/3/4/5: 스킬 · Space: 회피 · Q: 포션 · R: 탈것 · E: NPC 대화 · I: 인벤토리 · L: 퀘스트 · K: 도감 · C: 능력치 · V: 스킬트리 · G: 조합</div>
 
   <div id="bottom-bar">
     <button id="btn-inventory">🎒 인벤토리 (I)</button>
@@ -367,6 +384,7 @@
     <button id="btn-codex">📖 몬스터 도감 (K)</button>
     <button id="btn-statpanel">✦ 능력치 (C)<span id="stat-points-badge" class="hidden"></span></button>
     <button id="btn-skilltree">🌳 스킬트리 (V)<span id="skill-points-badge" class="hidden"></span></button>
+    <button id="btn-combine">💎 조합 (G)</button>
   </div>
 
   <div id="action-slots">
@@ -452,6 +470,19 @@
     </div>
     <div id="skilltree-points-line">스킬 포인트: <span id="skilltree-points-count">0</span></div>
     <div id="skilltree-rows"></div>
+  </div>
+
+  <div id="combine-panel" class="panel hidden">
+    <div class="ql-header">
+      <h2>조합</h2>
+      <button class="ql-close" id="combine-close">✕</button>
+    </div>
+    <div id="combine-tabs">
+      <button class="combine-tab active" data-tab="gem">보석 조합</button>
+      <button class="combine-tab" data-tab="rune">룬 조합</button>
+      <button class="combine-tab" data-tab="fusion">보석+룬 융합</button>
+    </div>
+    <div id="combine-body"></div>
   </div>
 
   <div id="inventory-panel" class="panel hidden">
@@ -554,10 +585,12 @@ const RARITY = {
   set:     { key:'set',     label:'세트',   color:'#3ddc6a', mult:1.8,  weight:35  },
   unique:  { key:'unique',  label:'유니크', color:'#ff8c2a', mult:2.8,  weight:15  },
   rune:    { key:'rune',    label:'룬',     color:'#c77dff', mult:1.0,  weight:0   },
+  gem:     { key:'gem',     label:'보석',   color:'#ff8ccf', mult:1.0,  weight:0   },
+  fusion:  { key:'fusion',  label:'각인석', color:'#ffb347', mult:1.0,  weight:0   },
 };
 
-const SLOT_LABEL = { weapon:'무기', armor:'방어구', accessory:'장신구', helmet:'투구', gloves:'장갑', boots:'신발', belt:'벨트', rune:'룬' };
-const SLOT_ICON = { weapon:'⚔️', armor:'🛡️', accessory:'💍', helmet:'⛑️', gloves:'🧤', boots:'👢', belt:'🎗️', rune:'🔮' };
+const SLOT_LABEL = { weapon:'무기', armor:'방어구', accessory:'장신구', helmet:'투구', gloves:'장갑', boots:'신발', belt:'벨트', rune:'룬', gem:'보석', fusion:'각인석' };
+const SLOT_ICON = { weapon:'⚔️', armor:'🛡️', accessory:'💍', helmet:'⛑️', gloves:'🧤', boots:'👢', belt:'🎗️', rune:'🔮', gem:'💎', fusion:'✨' };
 const EQUIP_SLOTS = ['weapon','helmet','armor','gloves','belt','boots','accessory'];
 
 // 세트 아이템 정의: 각 부위별 고정 아이템 + 세트 보너스
@@ -824,16 +857,74 @@ const RUNES = {
   ral: { id:'ral', name:'랄 룬',   color:'#ff8c2a', stats:{hp:18},          flavor:'생명의 온기가 흐른다.' },
   ort: { id:'ort', name:'오르 룬', color:'#ff8c2a', stats:{crit:2},         flavor:'번개처럼 날카로운 감각을 준다.' },
   sol: { id:'sol', name:'쏘울 룬', color:'#ff5c5c', stats:{atk:5, def:5},   flavor:'태양처럼 뜨거운 힘이 담겨 있다.' },
+  zod: { id:'zod', name:'조드 룬', color:'#c77dff', stats:{atk:8, def:8, crit:4, hp:25}, flavor:'세상에 몇 남지 않은 궁극의 문자. 시간 그 자체가 응축되어 있다.' },
 };
+// 룬 조합 순서: 같은 룬 3개를 모으면 다음 단계 룬 1개로 조합할 수 있다 (조드 룬이 최종 단계)
+const RUNE_ORDER = ['el','tir','ral','ort','sol','zod'];
+
 function createRuneItem(runeId){
   const r = RUNES[runeId];
   return { uid:itemUid++, name:r.name, slot:'rune', rarity:'rune', runeId, base:{}, enhance:0 };
 }
 
 function dropRandomRune(x, z){
-  const runeId = choice(Object.keys(RUNES));
+  // 상위 룬일수록 드랍 확률이 낮음 (조드 룬은 드랍되지 않고 조합으로만 획득 가능)
+  const dropPool = RUNE_ORDER.slice(0, -1);
+  const weights = [40, 28, 18, 10, 4];
+  let roll = Math.random()*weights.reduce((a,b)=>a+b,0);
+  let runeId = dropPool[0];
+  for(let i=0;i<dropPool.length;i++){
+    if(roll < weights[i]){ runeId = dropPool[i]; break; }
+    roll -= weights[i];
+  }
   const item = createRuneItem(runeId);
   spawnLoot(item, x, z);
+}
+
+// 디아블로 스타일 보석: 룬과 마찬가지로 소켓에 삽입 가능. 등급(하급~완벽)이 오를수록 효과가 커진다.
+const GEM_TIERS = ['chipped','normal','flawless','perfect'];
+const GEM_TIER_LABELS = { chipped:'하급', normal:'보통', flawless:'상급', perfect:'완벽' };
+const GEM_TIER_MULT = { chipped:1, normal:1.8, flawless:3, perfect:5 };
+const GEMS = {
+  ruby:     { id:'ruby',     name:'루비',     color:'#ff4a4a', stat:'atk',  base:3 },
+  sapphire: { id:'sapphire', name:'사파이어', color:'#4a8aff', stat:'def',  base:3 },
+  emerald:  { id:'emerald',  name:'에메랄드', color:'#3ddc6a', stat:'crit', base:1.2 },
+  topaz:    { id:'topaz',    name:'토파즈',   color:'#ffd84a', stat:'hp',   base:18 },
+};
+const GEM_STAT_LABELS = { atk:'공격력', def:'방어력', crit:'치명타%', hp:'체력' };
+
+function createGemItem(gemId, tier){
+  const g = GEMS[gemId];
+  return { uid:itemUid++, name:`${GEM_TIER_LABELS[tier]} ${g.name}`, slot:'gem', rarity:'gem', gemId, tier, base:{}, enhance:0 };
+}
+
+function gemStatValue(gemId, tier){
+  return GEMS[gemId].base * GEM_TIER_MULT[tier];
+}
+
+function dropRandomGem(x, z){
+  // 하급 보석만 드랍, 상위 등급은 조합으로만 획득 가능
+  const gemId = choice(Object.keys(GEMS));
+  const item = createGemItem(gemId, 'chipped');
+  spawnLoot(item, x, z);
+}
+
+// 보석 + 룬 융합: 각각의 스탯을 하나로 합친 "각인석" 생성 (조합 시스템)
+function computeFusionStats(gemItem, runeItem){
+  const g = GEMS[gemItem.gemId];
+  const gemVal = gemStatValue(gemItem.gemId, gemItem.tier);
+  const rs = RUNES[runeItem.runeId].stats;
+  const stats = { atk:rs.atk||0, def:rs.def||0, hp:rs.hp||0, crit:rs.crit||0 };
+  stats[g.stat] += gemVal;
+  stats.atk = Math.round(stats.atk); stats.def = Math.round(stats.def); stats.hp = Math.round(stats.hp);
+  stats.crit = Math.round(stats.crit*10)/10;
+  return stats;
+}
+function createFusionItem(gemItem, runeItem){
+  const stats = computeFusionStats(gemItem, runeItem);
+  const name = `${GEMS[gemItem.gemId].name}-${RUNES[runeItem.runeId].name.replace(' 룬','')} 각인석`;
+  return { uid:itemUid++, name, slot:'fusion', rarity:'fusion', fusionStats:stats, base:{}, enhance:0,
+    flavor:`${gemItem.name}과(와) ${runeItem.name}의 힘이 하나로 융합되었다.` };
 }
 
 // 강화 레벨에 따른 실제 스탯 (강화 1레벨당 기본 스탯의 12% 증가, crit은 +0.5/레벨)
@@ -848,15 +939,16 @@ function getScaledStats(item){
 }
 
 // 장비 비교용 대략적인 "전투력" 점수: 서로 다른 스탯 구성의 장비를 대충 비교하기 위한 가중합
+const SOCKETABLE_SLOTS = ['rune','gem','fusion'];
 function computeItemPower(item){
-  if(!item || item.slot === 'rune') return 0;
+  if(!item || SOCKETABLE_SLOTS.includes(item.slot)) return 0;
   const s = getScaledStats(item);
   return (s.atk||0)*2 + (s.def||0)*2 + (s.hp||0)*0.3 + (s.crit||0)*3;
 }
 
 // 파밍한 아이템이 현재 장착 중인 같은 부위 장비보다 강한지 (즉시 장착 추천 여부)
 function isUpgrade(item){
-  if(!item || item.slot === 'rune') return false;
+  if(!item || SOCKETABLE_SLOTS.includes(item.slot)) return false;
   const equipped = player.equipment[item.slot];
   if(!equipped) return true;
   return computeItemPower(item) > computeItemPower(equipped);
@@ -918,6 +1010,12 @@ const REBIRTH_BONUS_PCT = 8; // 환생 1회당 영구 능력치 증가율(%)
 const MAX_INVENTORY = 42;
 const DISASSEMBLE_YIELD = { normal:1, magic:2, rare:3, set:4, unique:5 };
 const SELL_VALUE = { normal:8, magic:20, rare:45, set:70, unique:110, rune:25 };
+const GEM_SELL_VALUE = { chipped:6, normal:14, flawless:30, perfect:60 };
+function getSellValue(item){
+  if(item.slot === 'gem') return GEM_SELL_VALUE[item.tier] || 6;
+  if(item.slot === 'fusion') return 50;
+  return SELL_VALUE[item.rarity] || 8;
+}
 
 // 직업 정의
 const CLASS_DEFS = {
@@ -1008,6 +1106,18 @@ function getTotalStats(){
         const rs = RUNES[runeId]?.stats;
         if(!rs) continue;
         stats.atk += rs.atk||0; stats.def += rs.def||0; stats.hp += rs.hp||0; stats.crit += rs.crit||0;
+      }
+    }
+    if(item.gems && item.gems.length){
+      for(const g of item.gems){
+        const def = GEMS[g.gemId];
+        if(!def) continue;
+        stats[def.stat] += gemStatValue(g.gemId, g.tier);
+      }
+    }
+    if(item.fusions && item.fusions.length){
+      for(const f of item.fusions){
+        stats.atk += f.atk||0; stats.def += f.def||0; stats.hp += f.hp||0; stats.crit += f.crit||0;
       }
     }
   }
@@ -2465,7 +2575,7 @@ const questLogPanel = document.getElementById('quest-log-panel');
 const codexPanel = document.getElementById('codex-panel');
 
 function isAnyPanelOpen(){
-  return !invPanel.classList.contains('hidden') || !npcPanel.classList.contains('hidden') || !questLogPanel.classList.contains('hidden') || !codexPanel.classList.contains('hidden') || !document.getElementById('stat-panel').classList.contains('hidden') || !document.getElementById('skilltree-panel').classList.contains('hidden');
+  return !invPanel.classList.contains('hidden') || !npcPanel.classList.contains('hidden') || !questLogPanel.classList.contains('hidden') || !codexPanel.classList.contains('hidden') || !document.getElementById('stat-panel').classList.contains('hidden') || !document.getElementById('skilltree-panel').classList.contains('hidden') || !document.getElementById('combine-panel').classList.contains('hidden');
 }
 
 function updateNPCs(dt){
@@ -2877,6 +2987,163 @@ function toggleSkillTree(){
 document.getElementById('skilltree-close').addEventListener('click', toggleSkillTree);
 document.getElementById('btn-skilltree').addEventListener('click', toggleSkillTree);
 
+/* ---------------------------- 조합 (보석/룬/융합) ---------------------------- */
+
+const combinePanel = document.getElementById('combine-panel');
+let combineActiveTab = 'gem';
+
+function combineGems(gemId, tier){
+  const idx = GEM_TIERS.indexOf(tier);
+  if(idx < 0 || idx >= GEM_TIERS.length-1) return;
+  const matching = player.inventory.filter(i=>i.slot==='gem' && i.gemId===gemId && i.tier===tier).slice(0,3);
+  if(matching.length < 3) return;
+  const consumeUids = new Set(matching.map(i=>i.uid));
+  player.inventory = player.inventory.filter(i=>!consumeUids.has(i.uid));
+  const newItem = createGemItem(gemId, GEM_TIERS[idx+1]);
+  player.inventory.push(newItem);
+  spawnToast(`${matching[0].name} 3개 → ${newItem.name} 조합 성공!`, '#ff8ccf');
+  SFX.enhanceSuccess();
+  renderInventory(); renderCombinePanel(); refreshHUD(); saveGame(true);
+}
+
+function combineRunes(runeId){
+  const idx = RUNE_ORDER.indexOf(runeId);
+  if(idx < 0 || idx >= RUNE_ORDER.length-1) return;
+  const matching = player.inventory.filter(i=>i.slot==='rune' && i.runeId===runeId).slice(0,3);
+  if(matching.length < 3) return;
+  const consumeUids = new Set(matching.map(i=>i.uid));
+  player.inventory = player.inventory.filter(i=>!consumeUids.has(i.uid));
+  const newItem = createRuneItem(RUNE_ORDER[idx+1]);
+  player.inventory.push(newItem);
+  spawnToast(`${RUNES[runeId].name} 3개 → ${newItem.name} 조합 성공!`, '#c77dff');
+  SFX.enhanceSuccess();
+  renderInventory(); renderCombinePanel(); refreshHUD(); saveGame(true);
+}
+
+function doFusion(){
+  const gemSel = document.getElementById('fusion-gem-select');
+  const runeSel = document.getElementById('fusion-rune-select');
+  if(!gemSel || !runeSel) return;
+  const gemUid = Number(gemSel.value), runeUid = Number(runeSel.value);
+  const gemItem = player.inventory.find(i=>i.uid===gemUid && i.slot==='gem');
+  const runeItem = player.inventory.find(i=>i.uid===runeUid && i.slot==='rune');
+  if(!gemItem || !runeItem) return;
+  player.inventory = player.inventory.filter(i=>i.uid!==gemItem.uid && i.uid!==runeItem.uid);
+  const fusionItem = createFusionItem(gemItem, runeItem);
+  player.inventory.push(fusionItem);
+  spawnToast(`${fusionItem.name} 융합 성공!`, '#ffb347');
+  SFX.enhanceSuccess();
+  renderInventory(); renderCombinePanel(); refreshHUD(); saveGame(true);
+}
+
+function renderCombineGemTab(){
+  const body = document.getElementById('combine-body');
+  const groups = {};
+  player.inventory.filter(i=>i.slot==='gem').forEach(i=>{
+    const key = i.gemId+'|'+i.tier;
+    groups[key] = (groups[key]||0)+1;
+  });
+  const rows = [];
+  Object.keys(GEMS).forEach(gemId=>{
+    GEM_TIERS.slice(0,-1).forEach(tier=>{
+      const count = groups[gemId+'|'+tier]||0;
+      if(count>0) rows.push({ gemId, tier, count });
+    });
+  });
+  if(rows.length===0){ body.innerHTML = '<div class="combine-empty">보유한 보석이 없습니다. 몬스터를 처치해 보석을 획득하세요.</div>'; return; }
+  body.innerHTML = rows.map(r=>{
+    const g = GEMS[r.gemId];
+    const nextTier = GEM_TIERS[GEM_TIERS.indexOf(r.tier)+1];
+    return `<div class="combine-row">
+      <div class="combine-row-info">
+        <div class="combine-row-name" style="color:${g.color};">${GEM_TIER_LABELS[r.tier]} ${g.name} x${r.count}</div>
+        <div class="combine-row-desc">3개 → ${GEM_TIER_LABELS[nextTier]} ${g.name} 1개</div>
+      </div>
+      <button class="combine-row-btn" data-gem="${r.gemId}" data-tier="${r.tier}" ${r.count>=3?'':'disabled'}>조합하기</button>
+    </div>`;
+  }).join('');
+  body.querySelectorAll('.combine-row-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> combineGems(btn.dataset.gem, btn.dataset.tier));
+  });
+}
+
+function renderCombineRuneTab(){
+  const body = document.getElementById('combine-body');
+  const groups = {};
+  player.inventory.filter(i=>i.slot==='rune').forEach(i=>{ groups[i.runeId] = (groups[i.runeId]||0)+1; });
+  const rows = RUNE_ORDER.slice(0,-1).map(runeId=>({runeId, count:groups[runeId]||0})).filter(r=>r.count>0);
+  if(rows.length===0){ body.innerHTML = '<div class="combine-empty">보유한 룬이 없습니다. 몬스터를 처치해 룬을 획득하세요.</div>'; return; }
+  body.innerHTML = rows.map(r=>{
+    const rd = RUNES[r.runeId];
+    const nextRune = RUNES[RUNE_ORDER[RUNE_ORDER.indexOf(r.runeId)+1]];
+    return `<div class="combine-row">
+      <div class="combine-row-info">
+        <div class="combine-row-name" style="color:${rd.color};">${rd.name} x${r.count}</div>
+        <div class="combine-row-desc">3개 → ${nextRune.name} 1개</div>
+      </div>
+      <button class="combine-row-btn" data-rune="${r.runeId}" ${r.count>=3?'':'disabled'}>조합하기</button>
+    </div>`;
+  }).join('');
+  body.querySelectorAll('.combine-row-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=> combineRunes(btn.dataset.rune));
+  });
+}
+
+function renderCombineFusionTab(){
+  const body = document.getElementById('combine-body');
+  const gems = player.inventory.filter(i=>i.slot==='gem');
+  const runes = player.inventory.filter(i=>i.slot==='rune');
+  if(gems.length===0 || runes.length===0){
+    body.innerHTML = '<div class="combine-empty">보석과 룬을 각각 최소 1개씩 보유해야 융합할 수 있습니다.</div>';
+    return;
+  }
+  body.innerHTML = `
+    <div id="combine-fusion-pickers">
+      <select id="fusion-gem-select">${gems.map(g=>`<option value="${g.uid}">${g.name}</option>`).join('')}</select>
+      <select id="fusion-rune-select">${runes.map(r=>`<option value="${r.uid}">${r.name}</option>`).join('')}</select>
+    </div>
+    <div id="combine-fusion-preview"></div>
+    <button class="combine-row-btn" id="fusion-btn" style="width:100%;">융합하기 (보석 1개 + 룬 1개 소모)</button>
+  `;
+  const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
+  const updatePreview = ()=>{
+    const gemUid = Number(document.getElementById('fusion-gem-select').value);
+    const runeUid = Number(document.getElementById('fusion-rune-select').value);
+    const gemItem = gems.find(g=>g.uid===gemUid);
+    const runeItem = runes.find(r=>r.uid===runeUid);
+    const previewEl = document.getElementById('combine-fusion-preview');
+    if(!gemItem || !runeItem){ previewEl.textContent=''; return; }
+    const stats = computeFusionStats(gemItem, runeItem);
+    const text = Object.entries(stats).filter(([,v])=>v).map(([k,v])=>`${labels[k]} +${v}${k==='crit'?'%':''}`).join(', ');
+    previewEl.textContent = '결과 능력치: ' + text;
+  };
+  document.getElementById('fusion-gem-select').addEventListener('change', updatePreview);
+  document.getElementById('fusion-rune-select').addEventListener('change', updatePreview);
+  document.getElementById('fusion-btn').addEventListener('click', doFusion);
+  updatePreview();
+}
+
+function renderCombinePanel(){
+  if(combineActiveTab==='gem') renderCombineGemTab();
+  else if(combineActiveTab==='rune') renderCombineRuneTab();
+  else renderCombineFusionTab();
+}
+
+function toggleCombinePanel(){
+  combinePanel.classList.toggle('hidden');
+  if(!combinePanel.classList.contains('hidden')) renderCombinePanel();
+}
+document.getElementById('combine-close').addEventListener('click', toggleCombinePanel);
+document.getElementById('btn-combine').addEventListener('click', toggleCombinePanel);
+document.querySelectorAll('.combine-tab').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.combine-tab').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    combineActiveTab = btn.dataset.tab;
+    renderCombinePanel();
+  });
+});
+
 /* ---------------------------- 입력 처리 ---------------------------- */
 
 const raycaster = new THREE.Raycaster();
@@ -2940,6 +3207,7 @@ window.addEventListener('keydown', (e)=>{
   if(matchKey(e,'KeyK','k')) toggleCodex();
   if(matchKey(e,'KeyC','c')) toggleStatPanel();
   if(matchKey(e,'KeyV','v')) toggleSkillTree();
+  if(matchKey(e,'KeyG','g')) toggleCombinePanel();
   if(matchKey(e,'KeyR','r')) toggleMount();
 });
 document.getElementById('slot-potion').addEventListener('click', usePotion);
@@ -3034,6 +3302,9 @@ function killMonster(monster){
   }
   if(Math.random() < (monster.def.isBoss ? 0.5 : 0.08)){
     dropRandomRune(dropX + rand(-0.7,0.7), dropZ + rand(-0.7,0.7));
+  }
+  if(Math.random() < (monster.def.isBoss ? 0.5 : 0.1)){
+    dropRandomGem(dropX + rand(-0.7,0.7), dropZ + rand(-0.7,0.7));
   }
   if(monster.type === 'chief' && !player.hasDungeonKey){
     player.hasDungeonKey = true;
@@ -3849,7 +4120,7 @@ function renderInventory(){
       if(item.sockets > 0){
         const sockBadge = document.createElement('span');
         sockBadge.className = 'socket-count-badge';
-        sockBadge.textContent = `🔮${(item.runes?item.runes.length:0)}/${item.sockets}`;
+        sockBadge.textContent = `🔮${socketUsedCount(item)}/${item.sockets}`;
         slotEl.appendChild(sockBadge);
       }
     }
@@ -3867,7 +4138,7 @@ function renderInventory(){
     div.className = 'inv-slot';
     if(item){
       div.classList.add('filled');
-      const rc = RARITY[item.rarity].color;
+      const rc = item.slot === 'gem' ? GEMS[item.gemId].color : RARITY[item.rarity].color;
       div.style.borderColor = rc;
       div.style.setProperty('--slot-tint', hexToRgba(rc, 0.16));
       const iconDiv = document.createElement('div');
@@ -3886,10 +4157,11 @@ function renderInventory(){
         div.appendChild(badge);
       }
       if(item.sockets > 0){
+        const used = socketUsedCount(item);
         const sockBadge = document.createElement('div');
         sockBadge.className = 'socket-count-badge';
-        sockBadge.textContent = `🔮${(item.runes?item.runes.length:0)}/${item.sockets}`;
-        sockBadge.title = `소켓 ${item.runes?item.runes.length:0}/${item.sockets}`;
+        sockBadge.textContent = `🔮${used}/${item.sockets}`;
+        sockBadge.title = `소켓 ${used}/${item.sockets}`;
         div.appendChild(sockBadge);
       }
       if(isUpgrade(item)){
@@ -3938,18 +4210,32 @@ function renderDetail(){
   if(!selectedItem){ empty.style.display='block'; content.style.display='none'; return; }
   empty.style.display='none'; content.style.display='block';
   const item = selectedItem.item;
-  const rc = RARITY[item.rarity].color;
   const isRune = item.slot === 'rune';
+  const isGem = item.slot === 'gem';
+  const isFusion = item.slot === 'fusion';
+  const isSocketable = isRune || isGem || isFusion;
+  const rc = isGem ? GEMS[item.gemId].color : RARITY[item.rarity].color;
 
   document.getElementById('detail-name').textContent = (item.enhance>0?`+${item.enhance} `:'')+item.name;
   document.getElementById('detail-name').style.color = rc;
-  document.getElementById('detail-type').textContent = `${SLOT_LABEL[item.slot]} · ${RARITY[item.rarity].label}${item.setName?' · '+item.setName:''}`;
+  document.getElementById('detail-type').textContent = isGem
+    ? `${SLOT_LABEL[item.slot]} · ${GEM_TIER_LABELS[item.tier]}`
+    : `${SLOT_LABEL[item.slot]} · ${RARITY[item.rarity].label}${item.setName?' · '+item.setName:''}`;
 
   if(isRune){
     const rd = RUNES[item.runeId];
     const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
     const statsText = Object.entries(rd.stats).map(([k,v])=>`${labels[k]||k} +${v}${k==='crit'?'%':''}`).join('<br>');
     document.getElementById('detail-stats').innerHTML = statsText + `<br><i style="color:#888;">"${rd.flavor}"</i>`;
+  } else if(isGem){
+    const g = GEMS[item.gemId];
+    const val = gemStatValue(item.gemId, item.tier);
+    const label = GEM_STAT_LABELS[g.stat];
+    document.getElementById('detail-stats').innerHTML = `${label} +${g.stat==='crit'?val.toFixed(1):Math.round(val)}${g.stat==='crit'?'%':''}`;
+  } else if(isFusion){
+    const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
+    const statsText = Object.entries(item.fusionStats||{}).filter(([,v])=>v).map(([k,v])=>`${labels[k]||k} +${v}${k==='crit'?'%':''}`).join('<br>');
+    document.getElementById('detail-stats').innerHTML = statsText + (item.flavor?`<br><i style="color:#888;">"${item.flavor}"</i>`:'');
   } else {
     document.getElementById('detail-stats').innerHTML = itemStatsText(item) + (item.flavor?`<br><i style="color:#888;">"${item.flavor}"</i>`:'');
   }
@@ -3959,29 +4245,29 @@ function renderDetail(){
     setInfo.innerHTML = SETS[item.setId].bonuses.map(b=>b.desc).join('<br>');
   } else { setInfo.innerHTML=''; }
 
-  renderSocketSection(item, isRune);
+  renderSocketSection(item, isSocketable);
 
   const isEquipped = selectedItem.from !== 'inv';
   const upgradeHint = document.getElementById('detail-upgrade-hint');
-  const itemIsUpgrade = !isEquipped && !isRune && isUpgrade(item);
+  const itemIsUpgrade = !isEquipped && !isSocketable && isUpgrade(item);
   upgradeHint.classList.toggle('hidden', !itemIsUpgrade);
   const equipBtn = document.getElementById('btn-equip');
-  equipBtn.style.display = (isEquipped || isRune) ? 'none':'inline-block';
+  equipBtn.style.display = (isEquipped || isSocketable) ? 'none':'inline-block';
   equipBtn.classList.toggle('upgrade', itemIsUpgrade);
   equipBtn.textContent = itemIsUpgrade ? '⬆ 즉시 장착' : '장착';
   document.getElementById('btn-unequip').style.display = isEquipped ? 'inline-block':'none';
   const disBtn = document.getElementById('btn-disassemble');
-  disBtn.style.display = (isEquipped || isRune) ? 'none' : 'inline-block';
+  disBtn.style.display = (isEquipped || isSocketable) ? 'none' : 'inline-block';
   disBtn.textContent = `🔨 분해 (강화석 +${DISASSEMBLE_YIELD[item.rarity]||1})`;
   const sellBtn = document.getElementById('btn-sell');
   sellBtn.style.display = isEquipped ? 'none' : 'inline-block';
-  sellBtn.textContent = `🪙 판매 (${SELL_VALUE[item.rarity]||8}G)`;
+  sellBtn.textContent = `🪙 판매 (${getSellValue(item)}G)`;
 
-  // 강화 정보 (룬은 강화 불가)
+  // 강화 정보 (룬/보석은 강화 불가)
   const enhanceInfoEl = document.getElementById('enhance-info');
   const enhanceBtn = document.getElementById('btn-enhance');
   const stoneBtn = document.getElementById('btn-use-stone');
-  if(isRune){
+  if(isSocketable){
     enhanceInfoEl.innerHTML = '';
     enhanceBtn.style.display = 'none';
     stoneBtn.style.display = 'none';
@@ -4001,33 +4287,46 @@ function renderDetail(){
 }
 
 // 디아블로 스타일 룬 소켓 UI: 장비는 보유 소켓/삽입된 룬을 보여주고, 룬은 삽입 가능한 장비 목록을 보여준다
-function renderSocketSection(item, isRune){
+function socketUsedCount(eq){
+  return (eq.runes?eq.runes.length:0) + (eq.gems?eq.gems.length:0) + (eq.fusions?eq.fusions.length:0);
+}
+
+function renderSocketSection(item, isSocketable){
   const el = document.getElementById('socket-info');
-  if(isRune){
+  if(isSocketable){
+    const kind = item.slot; // 'rune' | 'gem' | 'fusion'
     const rows = [];
     for(const slot in player.equipment){
       const eq = player.equipment[slot];
       if(!eq || !eq.sockets) continue;
-      const used = eq.runes ? eq.runes.length : 0;
+      const used = socketUsedCount(eq);
       rows.push({ slot, eq, used, open: used < eq.sockets });
     }
+    const label = kind==='gem' ? '💎 보석' : kind==='fusion' ? '✨ 각인석' : '🔮 룬';
     if(rows.length === 0){
-      el.innerHTML = '<div class="socket-title">🔮 룬</div><div style="color:#888;">소켓이 있는 장비를 착용하면 이 룬을 삽입할 수 있습니다.</div>';
+      el.innerHTML = `<div class="socket-title">${label}</div><div style="color:#888;">소켓이 있는 장비를 착용하면 이 아이템을 삽입할 수 있습니다.</div>`;
       return;
     }
-    el.innerHTML = '<div class="socket-title">🔮 소켓에 삽입할 장비 선택</div>' + rows.map(r=>
+    el.innerHTML = `<div class="socket-title">${label} 소켓에 삽입할 장비 선택</div>` + rows.map(r=>
       `<div class="socket-target-row"><span>${r.eq.name} (${r.used}/${r.eq.sockets})</span><button data-slot="${r.slot}" ${r.open?'':'disabled'}>삽입</button></div>`
     ).join('');
     el.querySelectorAll('button[data-slot]').forEach(btn=>{
-      btn.addEventListener('click', ()=> insertRune(btn.dataset.slot));
+      btn.addEventListener('click', ()=>{
+        if(kind==='gem') insertGem(btn.dataset.slot);
+        else if(kind==='fusion') insertFusion(btn.dataset.slot);
+        else insertRune(btn.dataset.slot);
+      });
     });
   } else {
     if(!item.sockets){ el.innerHTML=''; return; }
-    const used = item.runes ? item.runes.length : 0;
+    const used = socketUsedCount(item);
     let pips = '';
     for(let i=0;i<item.sockets;i++) pips += `<span class="socket-pip ${i<used?'filled':''}"></span>`;
-    const runeNames = (item.runes||[]).map(id=>RUNES[id]?.name).filter(Boolean).join(', ');
-    el.innerHTML = `<div class="socket-title">🔮 소켓 ${used}/${item.sockets}</div>${pips}${runeNames?`<div style="margin-top:4px;">삽입된 룬: ${runeNames}</div>`:''}`;
+    const runeNames = (item.runes||[]).map(id=>RUNES[id]?.name).filter(Boolean);
+    const gemNames = (item.gems||[]).map(g=>`${GEM_TIER_LABELS[g.tier]} ${GEMS[g.gemId]?.name}`);
+    const fusionNames = (item.fusions||[]).map((f,i)=>`각인석${i+1}`);
+    const names = [...runeNames, ...gemNames, ...fusionNames].join(', ');
+    el.innerHTML = `<div class="socket-title">🔮 소켓 ${used}/${item.sockets}</div>${pips}${names?`<div style="margin-top:4px;">삽입됨: ${names}</div>`:''}`;
   }
 }
 
@@ -4037,10 +4336,38 @@ function insertRune(targetSlot){
   const eq = player.equipment[targetSlot];
   if(!eq || !eq.sockets) return;
   if(!eq.runes) eq.runes = [];
-  if(eq.runes.length >= eq.sockets) return;
+  if(socketUsedCount(eq) >= eq.sockets) return;
   eq.runes.push(runeItem.runeId);
   player.inventory = player.inventory.filter(i=>i.uid!==runeItem.uid);
   spawnToast(`${RUNES[runeItem.runeId].name} 삽입: ${eq.name}`, '#c77dff');
+  selectedItem = null;
+  renderInventory(); renderDetail(); refreshHUD();
+}
+
+function insertGem(targetSlot){
+  if(!selectedItem || selectedItem.item.slot !== 'gem') return;
+  const gemItem = selectedItem.item;
+  const eq = player.equipment[targetSlot];
+  if(!eq || !eq.sockets) return;
+  if(!eq.gems) eq.gems = [];
+  if(socketUsedCount(eq) >= eq.sockets) return;
+  eq.gems.push({ gemId:gemItem.gemId, tier:gemItem.tier });
+  player.inventory = player.inventory.filter(i=>i.uid!==gemItem.uid);
+  spawnToast(`${gemItem.name} 삽입: ${eq.name}`, '#ff8ccf');
+  selectedItem = null;
+  renderInventory(); renderDetail(); refreshHUD();
+}
+
+function insertFusion(targetSlot){
+  if(!selectedItem || selectedItem.item.slot !== 'fusion') return;
+  const fusionItem = selectedItem.item;
+  const eq = player.equipment[targetSlot];
+  if(!eq || !eq.sockets) return;
+  if(!eq.fusions) eq.fusions = [];
+  if(socketUsedCount(eq) >= eq.sockets) return;
+  eq.fusions.push({ ...fusionItem.fusionStats });
+  player.inventory = player.inventory.filter(i=>i.uid!==fusionItem.uid);
+  spawnToast(`${fusionItem.name} 삽입: ${eq.name}`, '#ffb347');
   selectedItem = null;
   renderInventory(); renderDetail(); refreshHUD();
 }
@@ -4121,7 +4448,7 @@ document.getElementById('btn-disassemble').addEventListener('click', ()=>{
 document.getElementById('btn-sell').addEventListener('click', ()=>{
   if(!selectedItem || selectedItem.from!=='inv') return;
   const item = selectedItem.item;
-  const value = SELL_VALUE[item.rarity]||8;
+  const value = getSellValue(item);
   player.inventory = player.inventory.filter(i=>i.uid!==item.uid);
   addGold(value);
   spawnToast(`${item.name} 판매: +${value}G`, '#e8c66a');
@@ -4182,17 +4509,24 @@ function showTooltip(e, item){
   tooltipEl.style.display = 'block';
   tooltipEl.style.left = (e.clientX+16)+'px';
   tooltipEl.style.top = (e.clientY+8)+'px';
-  const rc = RARITY[item.rarity].color;
-  let statsHtml;
+  const rc = item.slot === 'gem' ? GEMS[item.gemId].color : RARITY[item.rarity].color;
+  let statsHtml, typeLine;
   if(item.slot === 'rune'){
     const rd = RUNES[item.runeId];
     const labels = { atk:'공격력', def:'방어력', hp:'체력', crit:'치명타%' };
     statsHtml = Object.entries(rd.stats).map(([k,v])=>`${labels[k]||k} +${v}${k==='crit'?'%':''}`).join('<br>');
+    typeLine = `${SLOT_LABEL[item.slot]} · ${RARITY[item.rarity].label}`;
+  } else if(item.slot === 'gem'){
+    const g = GEMS[item.gemId];
+    const val = gemStatValue(item.gemId, item.tier);
+    statsHtml = `${GEM_STAT_LABELS[g.stat]} +${g.stat==='crit'?val.toFixed(1):Math.round(val)}${g.stat==='crit'?'%':''}`;
+    typeLine = `${SLOT_LABEL[item.slot]} · ${GEM_TIER_LABELS[item.tier]}`;
   } else {
     statsHtml = itemStatsText(item);
+    typeLine = `${SLOT_LABEL[item.slot]} · ${RARITY[item.rarity].label}`;
   }
   tooltipEl.innerHTML = `<b style="color:${rc};">${item.enhance>0?'+'+item.enhance+' ':''}${item.name}</b><br>
-    <span style="color:#999;">${SLOT_LABEL[item.slot]} · ${RARITY[item.rarity].label}</span><br>${statsHtml}`;
+    <span style="color:#999;">${typeLine}</span><br>${statsHtml}`;
 }
 function hideTooltip(){ tooltipEl.style.display = 'none'; }
 
