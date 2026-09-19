@@ -60,11 +60,10 @@
   @keyframes toastOut{to{opacity:0;transform:translateX(20px);}}
 
   /* ---------- bottom action bar ---------- */
-  #bottom-bar{position:absolute;bottom:126px;left:50%;transform:translateX(-50%);display:flex;gap:6px;}
+  #bottom-bar{position:absolute;bottom:14px;left:14px;display:flex;gap:6px;flex-wrap:wrap;max-width:230px;}
   .action-slot.menu-slot{padding:0;font-family:inherit;}
   .action-slot.menu-slot .icon{font-size:18px;}
 
-  #controls-hint{position:absolute;bottom:14px;left:14px;color:#aaa;font-size:11px;background:rgba(0,0,0,0.5);padding:6px 10px;border-radius:4px;}
 
   /* ---------- inventory panel ---------- */
   #inventory-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:760px;max-width:94vw;max-height:88vh;padding:16px;color:#eee;display:flex;flex-direction:column;}
@@ -145,7 +144,7 @@
 
   /* ---------- 액션 슬롯 (포션/회피) ---------- */
   #action-slots{position:absolute;bottom:14px;right:14px;display:flex;gap:6px;flex-wrap:wrap;max-width:470px;justify-content:flex-end;}
-  #action-slots-left{position:absolute;bottom:46px;left:14px;display:flex;gap:6px;}
+  #action-slots-left{position:absolute;bottom:122px;left:14px;display:flex;gap:6px;}
   .action-slot{width:48px;height:48px;border-radius:8px;background:rgba(20,16,10,0.9);border:2px solid var(--panel-border);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#eee;position:relative;cursor:pointer;}
   .action-slot .icon{font-size:20px;}
   .action-slot .key{position:absolute;top:2px;left:4px;font-size:9px;color:#999;}
@@ -387,8 +386,6 @@
 
   <div id="toast-container"></div>
   <div id="npc-prompt">E: 대화</div>
-
-  <div id="controls-hint">WASD/방향키·클릭: 이동 · 클릭/Z: 공격 · 1/2/3/4/5: 스킬 · Space: 회피 · Q: 포션 · R: 탈것 · E: NPC 대화 · I: 인벤토리 · L: 퀘스트 · K: 도감 · C: 능력치 · V: 스킬트리 · G: 조합 · T: 마을 이동</div>
 
   <div id="bottom-bar">
     <button class="action-slot menu-slot" id="btn-inventory" title="인벤토리: 아이템 확인 · 장비 교체 · 판매"><span class="key">I</span><span class="icon">🎒</span></button>
@@ -3462,6 +3459,22 @@ function allocateStat(stat){
   saveGame(true);
 }
 
+// 버튼을 누르고 있으면 능력치가 계속 자동으로 배분됨
+let statRepeatTimeout = null, statRepeatInterval = null;
+function startStatRepeat(stat){
+  stopStatRepeat();
+  allocateStat(stat);
+  statRepeatTimeout = setTimeout(()=>{
+    statRepeatInterval = setInterval(()=> allocateStat(stat), 110);
+  }, 350);
+}
+function stopStatRepeat(){
+  if(statRepeatTimeout){ clearTimeout(statRepeatTimeout); statRepeatTimeout = null; }
+  if(statRepeatInterval){ clearInterval(statRepeatInterval); statRepeatInterval = null; }
+}
+window.addEventListener('mouseup', stopStatRepeat);
+window.addEventListener('mouseleave', stopStatRepeat);
+
 function renderStatPanel(){
   const rows = document.getElementById('stat-rows');
   rows.innerHTML = Object.keys(STAT_ALLOC_INFO).map(stat=>{
@@ -3475,7 +3488,7 @@ function renderStatPanel(){
   }).join('');
   document.getElementById('stat-points-count').textContent = player.statPoints;
   rows.querySelectorAll('.stat-row-btn').forEach(btn=>{
-    btn.addEventListener('click', ()=> allocateStat(btn.dataset.stat));
+    btn.addEventListener('mousedown', (e)=>{ e.preventDefault(); startStatRepeat(btn.dataset.stat); });
   });
 }
 
