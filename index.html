@@ -1271,7 +1271,7 @@ const player = {
 const JUNK_RARITY_OPTIONS = ['normal','magic','rare','set'];
 const STAT_ALLOC_INFO = {
   str:{ label:'힘 (STR)', desc:'공격력 +1' },
-  agi:{ label:'민첩 (AGI)', desc:'치명타 +0.3%' },
+  agi:{ label:'민첩 (AGI)', desc:'치명타 +0.3%, 회피 +0.25%' },
   int:{ label:'지능 (INT)', desc:'최대 마력 +5' },
   vit:{ label:'체력 (VIT)', desc:'최대 체력 +4' },
 };
@@ -1462,6 +1462,7 @@ function getTotalStats(){
   const alloc = player.allocatedStats;
   stats.atk += (alloc.str||0)*1;
   stats.crit += (alloc.agi||0)*0.3;
+  stats.dodge = (alloc.agi||0)*0.25; // 민첩 투자로 회피율을 얻는다 (몬스터 공격을 완전히 무효화)
   stats.hp += (alloc.vit||0)*4;
   applyTreePassiveStats(stats); // 스킬트리 루트 심화 패시브(s2x/s2bx/s2cx) 보너스
   for(const slot in player.equipment){
@@ -1525,6 +1526,7 @@ function getTotalStats(){
   if(lowHpSpecial && player.hp <= stats.hp*lowHpSpecial.threshold){
     stats.def = Math.round(stats.def*(1+lowHpSpecial.bonus));
   }
+  stats.dodge = Math.min(40, stats.dodge); // 회피율 상한: 민첩 올인으로 무적이 되지 않도록 40%로 제한
   stats._activeSetBonuses = activeSetBonuses;
   stats._setSpecials = setSpecials;
   return stats;
@@ -1898,6 +1900,10 @@ function getDamageReduction(){
   const w = player.equipment.weapon;
   if(w && w.isGrowthWeapon && w.growthPath === 'titan') dr += GROWTH_PATHS.titan.dr;
   return Math.min(0.85, dr);
+}
+// 민첩 투자로 얻은 회피율 판정: 성공하면 몬스터 공격을 완전히 무효화한다 (회피 대시의 무적 판정과는 별개의, 상시 적용되는 확률형 회피)
+function rollPlayerDodge(){
+  return Math.random()*100 < getTotalStats().dodge;
 }
 // 성장무기 "피의 각인" 경로: 가한 피해의 일부를 체력으로 흡수
 function applyGrowthLifesteal(dmg){
@@ -2692,7 +2698,7 @@ function updateProjectiles(dt){
     p.life -= dt;
     const hitPlayer = player.alive && p.pos.distanceTo(playerState.pos) < 0.9 && Math.abs(p.pos.y-1.1) < 1.2;
     if(hitPlayer){
-      if(!playerState.invulnerable){
+      if(!playerState.invulnerable && !rollPlayerDodge()){
         if(p.sourceMonster && p.sourceMonster.alive) playerState.targetMonster = p.sourceMonster;
         const stats = getTotalStats();
         let dmg = Math.max(1, Math.round(p.dmg*rand(0.85,1.1) - stats.def*0.4));
@@ -5091,7 +5097,7 @@ function checkBossPhaseTransition(m){
   flashSkillEffect(m.pos, 0xff3838, 4.5);
   // 전환 파동: 근처에 있으면 피해
   const wp = playerState.pos.clone(); wp.y = 2.2;
-  if(playerState.pos.distanceTo(m.pos) < 4.5 && player.alive && !playerState.invulnerable){
+  if(playerState.pos.distanceTo(m.pos) < 4.5 && player.alive && !playerState.invulnerable && !rollPlayerDodge()){
     const stats = getTotalStats();
     let dmg = Math.max(1, Math.round(m.def.atk*1.4 - stats.def*0.4));
     dmg = Math.max(1, Math.round(dmg*(1-getDamageReduction())));
@@ -5108,7 +5114,7 @@ function checkBossPhaseTransition(m){
 function monsterAttackPlayer(m){
   // 몬스터가 먼저 공격해와도 상태창에 표시되도록 현재 타겟으로 지정
   playerState.targetMonster = m;
-  if(playerState.invulnerable){
+  if(playerState.invulnerable || rollPlayerDodge()){
     const wp = playerState.pos.clone(); wp.y = 2.2;
     spawnDamageNumberAt(wp, '회피!', false, '#8ad8ff');
     return;
@@ -6072,6 +6078,7 @@ function renderCharStats(){
     <div>방어력</div><div>${s.def}</div>
     <div>체력</div><div>${s.hp}</div>
     <div>치명타</div><div>${s.crit.toFixed(1)}%</div>
+    <div>회피</div><div>${s.dodge.toFixed(1)}%</div>
     <div>골드</div><div>${player.gold}</div>
     <div>레벨</div><div>${player.level}</div>
     ${player.statPoints>0?`<div style="color:var(--gold);">분배 가능</div><div style="color:var(--gold);">${player.statPoints}P</div>`:''}
