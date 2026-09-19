@@ -29,8 +29,8 @@
   .bar-wrap{flex:1;height:16px;background:#1a1a1a;border:1px solid #444;border-radius:3px;overflow:hidden;position:relative;}
   .bar-fill{height:100%;transition:width 0.25s ease;}
   .bar-hp{background:linear-gradient(180deg,#ff5c5c,#a11d1d);}
-  .bar-xp{background:linear-gradient(180deg,#4a9eff,#1d5aa1);}
-  .bar-mp{background:linear-gradient(180deg,#3ddcd8,#1a6e6b);}
+  .bar-xp{background:linear-gradient(180deg,#3ddcd8,#1a6e6b);}
+  .bar-mp{background:linear-gradient(180deg,#4a9eff,#1d5aa1);}
   .bar-text{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:10px;color:#fff;text-shadow:0 1px 2px #000;}
   #hud-status-effects{margin-top:6px;font-size:10px;line-height:1.6;}
   #hud-status-effects .fx-line{display:flex;align-items:center;gap:4px;color:#dbe8ff;}
@@ -361,13 +361,13 @@
       <div class="lvl-badge" id="lvl-badge">1</div>
       <div class="bar-wrap"><div class="bar-fill bar-hp" id="hp-bar" style="width:100%"></div><div class="bar-text" id="hp-text">100/100</div></div>
     </div>
-    <div class="row">
-      <div style="width:30px;"></div>
-      <div class="bar-wrap" style="height:10px;"><div class="bar-fill bar-xp" id="xp-bar" style="width:0%"></div></div>
-    </div>
     <div class="row" id="hud-mp-row" style="display:none;">
       <div style="width:30px;"></div>
       <div class="bar-wrap" style="height:11px;"><div class="bar-fill bar-mp" id="hud-mp-bar" style="width:100%"></div><div class="bar-text" id="hud-mp-text" style="font-size:9px;"></div></div>
+    </div>
+    <div class="row">
+      <div style="width:30px;"></div>
+      <div class="bar-wrap" style="height:10px;"><div class="bar-fill bar-xp" id="xp-bar" style="width:0%"></div><div class="bar-text" id="xp-text" style="font-size:9px;"></div></div>
     </div>
     <div id="gold-display">🪙 <span id="gold-amount">0</span> G &nbsp; 💎 <span id="stone-amount">0</span></div>
     <div id="rebirth-badge" style="display:none;font-size:11px;color:#ffd84a;margin-top:2px;"></div>
@@ -5246,7 +5246,9 @@ function refreshHUD(){
   const hpPct = clamp(player.hp/stats.hp*100,0,100);
   document.getElementById('hp-bar').style.width = hpPct+'%';
   document.getElementById('hp-text').textContent = `${Math.max(0,Math.round(player.hp))}/${stats.hp}`;
-  document.getElementById('xp-bar').style.width = (player.xp/player.xpToNext*100)+'%';
+  const xpPct = player.xp/player.xpToNext*100;
+  document.getElementById('xp-bar').style.width = xpPct+'%';
+  document.getElementById('xp-text').textContent = `${xpPct.toFixed(1)}%`;
   document.getElementById('gold-amount').textContent = player.gold;
   document.getElementById('stone-amount').textContent = player.enhanceStones;
   updateHudExtras();
