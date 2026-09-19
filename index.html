@@ -240,6 +240,14 @@
 
   /* ---------- 조합 패널 ---------- */
   #combine-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:460px;max-width:92vw;max-height:82vh;overflow-y:auto;padding:16px;color:#eee;}
+  #travel-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:360px;max-width:92vw;padding:16px;color:#eee;}
+  #travel-panel.hidden{display:none;}
+  .travel-row{display:flex;align-items:center;justify-content:space-between;padding:10px;background:rgba(255,255,255,0.04);border-radius:7px;margin-bottom:8px;border:1px solid var(--panel-border);}
+  .travel-row-name{font-size:13px;font-weight:bold;color:#eee;}
+  .travel-row-btn{padding:7px 14px;border-radius:5px;border:1px solid #4dd9ff;background:rgba(77,217,255,0.12);color:#4dd9ff;cursor:pointer;font-size:12px;}
+  .travel-row-btn:disabled{opacity:0.3;cursor:not-allowed;border-color:#555;color:#888;}
+  .travel-row-req{font-size:10px;color:#8ad8ff;margin-top:3px;}
+  .travel-row-req.unmet{color:#ff8a8a;}
   #combine-panel.hidden{display:none;}
   #combine-tabs{display:flex;gap:6px;margin-bottom:12px;}
   .combine-tab{flex:1;padding:7px 0;background:rgba(255,255,255,0.05);border:1px solid var(--panel-border);color:#aaa;font-size:11px;cursor:pointer;border-radius:4px;}
@@ -379,7 +387,7 @@
   <div id="toast-container"></div>
   <div id="npc-prompt">E: 대화</div>
 
-  <div id="controls-hint">WASD/방향키·클릭: 이동 · 클릭/Z: 공격 · 1/2/3/4/5: 스킬 · Space: 회피 · Q: 포션 · R: 탈것 · E: NPC 대화 · I: 인벤토리 · L: 퀘스트 · K: 도감 · C: 능력치 · V: 스킬트리 · G: 조합</div>
+  <div id="controls-hint">WASD/방향키·클릭: 이동 · 클릭/Z: 공격 · 1/2/3/4/5: 스킬 · Space: 회피 · Q: 포션 · R: 탈것 · E: NPC 대화 · I: 인벤토리 · L: 퀘스트 · K: 도감 · C: 능력치 · V: 스킬트리 · G: 조합 · T: 마을 이동</div>
 
   <div id="bottom-bar">
     <button id="btn-inventory">🎒 인벤토리 (I)</button>
@@ -388,6 +396,7 @@
     <button id="btn-statpanel">✦ 능력치 (C)<span id="stat-points-badge" class="hidden"></span></button>
     <button id="btn-skilltree">🌳 스킬트리 (V)<span id="skill-points-badge" class="hidden"></span></button>
     <button id="btn-combine">💎 조합 (G)</button>
+    <button id="btn-travel">🌀 마을 이동 (T)</button>
   </div>
 
   <div id="action-slots">
@@ -486,6 +495,14 @@
       <button class="combine-tab" data-tab="fusion">보석+룬 융합</button>
     </div>
     <div id="combine-body"></div>
+  </div>
+
+  <div id="travel-panel" class="panel hidden">
+    <div class="ql-header">
+      <h2>마을 이동</h2>
+      <button class="ql-close" id="travel-close">✕</button>
+    </div>
+    <div id="travel-rows"></div>
   </div>
 
   <div id="inventory-panel" class="panel hidden">
@@ -693,6 +710,14 @@ const MONSTER_DEFS = {
               ranged:true, range:8, minRange:3, projSpeed:12 },
   sentinel: { name:'균열의 파수병', hp:130, atk:19, def:9, speed:1.5, xp:70, goldMin:30, goldMax:50, color:0x4a5a7a, scale:1.7, aggro:10, shape:'crystal' },
   tentacle: { name:'심연의 촉수', hp:75, atk:16, def:5, speed:1.2, xp:48, goldMin:20, goldMax:34, color:0x2a6a5a, scale:1.35, aggro:9, shape:'blob' },
+  drowned:  { name:'익사한 선원', hp:75, atk:18, def:6, speed:1.8, xp:44, goldMin:18, goldMax:30, color:0x3a5a5a, scale:1.2, aggro:9 },
+  seaghost: { name:'저주받은 뱃사공', hp:55, atk:16, def:3, speed:2.2, xp:36, goldMin:14, goldMax:24, color:0x5a8a9a, scale:1.05, aggro:11, shape:'blob',
+              ranged:true, range:8, minRange:3, projSpeed:13 },
+  pirateking: { name:'잊혀진 해적왕', hp:480, atk:28, def:11, speed:1.8, xp:280, goldMin:130, goldMax:210, color:0x2a3a4a, scale:2.3, aggro:22, isBoss:true },
+  sandwraith: { name:'모래 망령', hp:65, atk:19, def:4, speed:2.3, xp:40, goldMin:16, goldMax:27, color:0xd8b878, scale:1.1, aggro:11, shape:'blob',
+              ranged:true, range:8, minRange:3, projSpeed:13 },
+  scarab:   { name:'저주받은 풍뎅이', hp:45, atk:15, def:3, speed:3.0, xp:30, goldMin:11, goldMax:19, color:0x4a3a2a, scale:0.85, aggro:10 },
+  pharaoh:  { name:'파라오의 저주', hp:560, atk:31, def:13, speed:1.7, xp:320, goldMin:150, goldMax:240, color:0xc9a227, scale:2.35, aggro:22, isBoss:true, shape:'crystal' },
 };
 
 // 퀘스트 정의
@@ -721,11 +746,27 @@ const QUEST_DEFS = {
   side_wraith: { id:'side_wraith', chain:'side', giver:'merchant', title:'떠도는 망령',
            desc:'심연의 균열에 나타나는 시간을 잃은 망령 6마리를 처치해주세요.',
            type:'kill', monsterType:'wraith', required:6, rewardGold:150, rewardXp:80, requiresFlag:'hasAbyssKey' },
+  main5: { id:'main5', chain:'main', order:5, giver:'harbor_elder', title:'해적왕의 최후',
+           desc:'항만 마을 너머 침몰한 유적에서 잊혀진 해적왕을 처치하고 유적을 클리어하세요.',
+           type:'dungeonClear3', required:1, rewardGold:700, rewardXp:550, rewardItem:true },
+  main6: { id:'main6', chain:'main', order:6, giver:'desert_elder', title:'파라오의 저주',
+           desc:'사막 마을 너머 모래 무덤에서 파라오의 저주를 처치하고 무덤을 클리어하세요.',
+           type:'dungeonClear4', required:1, rewardGold:900, rewardXp:700, rewardItem:true },
+  side_drowned: { id:'side_drowned', chain:'side', giver:'harbor_merchant', title:'침몰한 자들',
+           desc:'항구 근처를 떠도는 익사한 선원 6마리를 처치해주세요.',
+           type:'kill', monsterType:'drowned', required:6, rewardGold:160, rewardXp:90 },
+  side_sandwraith: { id:'side_sandwraith', chain:'side', giver:'desert_merchant', title:'모래바람 정화',
+           desc:'사막을 떠도는 모래 망령 6마리를 처치해주세요.',
+           type:'kill', monsterType:'sandwraith', required:6, rewardGold:170, rewardXp:95 },
 };
 const NPC_GREETINGS = {
   elder: '어서 오게, 젊은이. 마을에 자네 같은 사람이 필요하다네.',
   merchant: '물건 좀 보고 가시게! 여행자에게 필요한 건 다 있다네.',
   blacksmith: '쇠 두드리는 소리가 마음을 편하게 하지. 무슨 일인가?',
+  harbor_elder: '항구에 온 걸 환영하네. 바다 너머 유적에서 불길한 기운이 느껴져...',
+  harbor_merchant: '싱싱한 물건들이오! 먼 바다에서 건져온 것들도 있지.',
+  desert_elder: '모래바람을 뚫고 왔군. 이 사막엔 옛 왕의 저주가 잠들어 있다네.',
+  desert_merchant: '목마르지 않은가? 사막을 건너는 이에게 필요한 게 다 있소.',
 };
 
 /* ---------------------------- 유틸 함수 ---------------------------- */
@@ -993,6 +1034,7 @@ const player = {
   junkThreshold:'magic',
   skillPoints:0,
   skillRanks:{ s1:0, s2:0, s3:0, s5:0 },
+  currentTown:'town1',
 };
 const JUNK_RARITY_OPTIONS = ['normal','magic','rare','set'];
 const STAT_ALLOC_INFO = {
@@ -2202,8 +2244,10 @@ const exitLabel = makePortalLabel('🌀 귀환 포탈');
 
 function clampToArenaIfNeeded(){
   if(!player.inDungeon) return;
-  const center = dungeonState2.active ? DUNGEON2_CENTER : DUNGEON_CENTER;
-  const radius = dungeonState2.active ? ARENA2_RADIUS : ARENA_RADIUS;
+  let center = DUNGEON_CENTER, radius = ARENA_RADIUS;
+  if(dungeonState2.active){ center = DUNGEON2_CENTER; radius = ARENA2_RADIUS; }
+  else if(dungeonState3.active){ center = DUNGEON3_CENTER; radius = ARENA3_RADIUS; }
+  else if(dungeonState4.active){ center = DUNGEON4_CENTER; radius = ARENA4_RADIUS; }
   const d = playerState.pos.distanceTo(center);
   if(d > radius-1){
     const dir = new THREE.Vector3().subVectors(playerState.pos, center).normalize();
@@ -2237,6 +2281,7 @@ function startDungeon(){
     }
     return;
   }
+  if(!checkDungeonLevelGate('dungeon1')) return;
   dungeonState.transitioning = true;
   SFX.portal();
   fadeTransition(()=>{
@@ -2464,6 +2509,7 @@ function startDungeon2(){
     }
     return;
   }
+  if(!checkDungeonLevelGate('dungeon2')) return;
   dungeonState2.transitioning = true;
   SFX.portal();
   fadeTransition(()=>{
@@ -2569,6 +2615,469 @@ function updatePortals2(dt){
   projectLabel(exitLabel2, exitPortal2.position, 2.6);
 }
 
+/* ---------------------------- 제2의 마을: 항만 마을 ---------------------------- */
+
+const TOWN2_CENTER = new THREE.Vector3(0,0,3000);
+let townGround2 = null;
+
+function buildTown2(){
+  townGround2 = new THREE.Mesh(
+    new THREE.CircleGeometry(48, 40),
+    new THREE.MeshStandardMaterial({ color:0x4a7c6a })
+  );
+  townGround2.rotation.x = -Math.PI/2;
+  townGround2.position.copy(TOWN2_CENTER); townGround2.position.y = -0.01;
+  townGround2.receiveShadow = true;
+  scene.add(townGround2);
+
+  for(let i=0;i<16;i++){
+    const x = TOWN2_CENTER.x+rand(-40,40), z = TOWN2_CENTER.z+rand(-40,40);
+    if(Math.hypot(x-TOWN2_CENTER.x,z-TOWN2_CENTER.z) < TOWN_RADIUS) continue;
+    const t = makeTree(x,z); scene.add(t); obstacles.push({pos:new THREE.Vector3(x,0,z), radius:0.7});
+  }
+  for(let i=0;i<8;i++){
+    const x = TOWN2_CENTER.x+rand(-40,40), z = TOWN2_CENTER.z+rand(-40,40);
+    if(Math.hypot(x-TOWN2_CENTER.x,z-TOWN2_CENTER.z) < TOWN_RADIUS-2) continue;
+    const r = makeRock(x,z); scene.add(r); obstacles.push({pos:new THREE.Vector3(x,0,z), radius:0.9});
+  }
+  [[12,8],[-12,9],[8,-12]].forEach(([dx,dz])=>{
+    const x = TOWN2_CENTER.x+dx, z = TOWN2_CENTER.z+dz;
+    const h = makeHouse(x,z); scene.add(h); obstacles.push({pos:new THREE.Vector3(x,0,z), radius:3.2});
+  });
+  const well2 = makeWell(TOWN2_CENTER.x-1.5, TOWN2_CENTER.z-2.5);
+  scene.add(well2);
+  obstacles.push({pos:new THREE.Vector3(TOWN2_CENTER.x-1.5,0,TOWN2_CENTER.z-2.5), radius:1.6});
+
+  npcs.push(makeNPC('항구 촌장 델마', 'harbor_elder', TOWN2_CENTER.x+2.4, TOWN2_CENTER.z+3.2, 0x2a5a7a, 0xffd84a));
+  npcs.push(makeNPC('행상인 유나', 'harbor_merchant', TOWN2_CENTER.x-4.2, TOWN2_CENTER.z+1.8, 0x3a7a8a, 0x4a9eff));
+
+  // 항만 주변 필드 몬스터 (기존 오버월드 몬스터 재활용)
+  const fieldSpots = [[18,10],[-16,14],[22,-8],[-20,-10],[10,22],[-14,-20]];
+  fieldSpots.forEach(([dx,dz],i)=>{
+    const type = i%3===0 ? 'orc' : i%2===0 ? 'archer' : 'wolf';
+    spawnMonster(type, TOWN2_CENTER.x+dx, TOWN2_CENTER.z+dz);
+  });
+}
+buildTown2();
+
+/* ---------------------------- 제3의 마을: 사막 마을 ---------------------------- */
+
+const TOWN3_CENTER = new THREE.Vector3(0,0,-3000);
+let townGround3 = null;
+
+function buildTown3(){
+  townGround3 = new THREE.Mesh(
+    new THREE.CircleGeometry(48, 40),
+    new THREE.MeshStandardMaterial({ color:0xc9a86a })
+  );
+  townGround3.rotation.x = -Math.PI/2;
+  townGround3.position.copy(TOWN3_CENTER); townGround3.position.y = -0.01;
+  townGround3.receiveShadow = true;
+  scene.add(townGround3);
+
+  for(let i=0;i<10;i++){
+    const x = TOWN3_CENTER.x+rand(-40,40), z = TOWN3_CENTER.z+rand(-40,40);
+    if(Math.hypot(x-TOWN3_CENTER.x,z-TOWN3_CENTER.z) < TOWN_RADIUS) continue;
+    const r = makeRock(x,z); scene.add(r); obstacles.push({pos:new THREE.Vector3(x,0,z), radius:0.9});
+  }
+  [[12,8],[-12,9],[8,-12]].forEach(([dx,dz])=>{
+    const x = TOWN3_CENTER.x+dx, z = TOWN3_CENTER.z+dz;
+    const h = makeHouse(x,z); scene.add(h); obstacles.push({pos:new THREE.Vector3(x,0,z), radius:3.2});
+  });
+  const well3 = makeWell(TOWN3_CENTER.x-1.5, TOWN3_CENTER.z-2.5);
+  scene.add(well3);
+  obstacles.push({pos:new THREE.Vector3(TOWN3_CENTER.x-1.5,0,TOWN3_CENTER.z-2.5), radius:1.6});
+
+  npcs.push(makeNPC('사막 족장 라시드', 'desert_elder', TOWN3_CENTER.x+2.4, TOWN3_CENTER.z+3.2, 0x8a6a2a, 0xffd84a));
+  npcs.push(makeNPC('떠돌이 상인 카심', 'desert_merchant', TOWN3_CENTER.x-4.2, TOWN3_CENTER.z+1.8, 0xa07a3a, 0x4a9eff));
+
+  const fieldSpots = [[18,10],[-16,14],[22,-8],[-20,-10],[10,22],[-14,-20]];
+  fieldSpots.forEach(([dx,dz],i)=>{
+    const type = i%3===0 ? 'orc' : i%2===0 ? 'archer' : 'goblin';
+    spawnMonster(type, TOWN3_CENTER.x+dx, TOWN3_CENTER.z+dz);
+  });
+}
+buildTown3();
+
+/* ---------------------------- 던전 3: 침몰한 유적 (항만 마을 소속) ---------------------------- */
+
+const DUNGEON3_CENTER = new THREE.Vector3(TOWN2_CENTER.x, 0, TOWN2_CENTER.z+1000);
+const ARENA3_RADIUS = 19;
+const DUNGEON3_TOTAL_WAVES = 4;
+const dungeonState3 = { active:false, wave:0, bossSpawned:false, bossAlive:false, cleared:false, transitioning:false };
+
+const entrancePortal3 = makePortal(0x2a9ad9);
+entrancePortal3.position.set(TOWN2_CENTER.x, 0, TOWN2_CENTER.z+42);
+scene.add(entrancePortal3);
+const entranceLabel3 = makePortalLabel('🌀 침몰한 유적');
+
+let arenaGround3 = null;
+function buildArena3(){
+  arenaGround3 = new THREE.Mesh(
+    new THREE.CircleGeometry(ARENA3_RADIUS, 42),
+    new THREE.MeshStandardMaterial({ color:0x1a2e2e })
+  );
+  arenaGround3.rotation.x = -Math.PI/2;
+  arenaGround3.position.copy(DUNGEON3_CENTER);
+  arenaGround3.receiveShadow = true;
+  scene.add(arenaGround3);
+
+  const pillarCount = 15;
+  for(let i=0;i<pillarCount;i++){
+    const angle = (i/pillarCount)*Math.PI*2;
+    const px = DUNGEON3_CENTER.x + Math.cos(angle)*(ARENA3_RADIUS+0.6);
+    const pz = DUNGEON3_CENTER.z + Math.sin(angle)*(ARENA3_RADIUS+0.6);
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.65,4.2,8), new THREE.MeshStandardMaterial({color:0x14201f}));
+    pillar.position.set(px,2.1,pz); pillar.castShadow = true;
+    scene.add(pillar);
+  }
+  const torchLight = new THREE.PointLight(0x2ad9c4, 1.8, 36);
+  torchLight.position.set(DUNGEON3_CENTER.x, 8.5, DUNGEON3_CENTER.z);
+  scene.add(torchLight);
+  const ringTorchCount = 4;
+  for(let i=0;i<ringTorchCount;i++){
+    const angle = (i/ringTorchCount)*Math.PI*2 + Math.PI/4;
+    const tx = DUNGEON3_CENTER.x + Math.cos(angle)*(ARENA3_RADIUS*0.6);
+    const tz = DUNGEON3_CENTER.z + Math.sin(angle)*(ARENA3_RADIUS*0.6);
+    const ringTorch = new THREE.PointLight(0x2ad9c4, 1.1, 22);
+    ringTorch.position.set(tx, 5, tz);
+    scene.add(ringTorch);
+  }
+}
+buildArena3();
+
+const exitPortal3 = makePortal(0xffaa4d);
+exitPortal3.position.set(DUNGEON3_CENTER.x, 0, DUNGEON3_CENTER.z + ARENA3_RADIUS - 2.5);
+scene.add(exitPortal3);
+const exitLabel3 = makePortalLabel('🌀 귀환 포탈');
+
+const DUNGEON3_ENTRY = new THREE.Vector3(DUNGEON3_CENTER.x, 0, DUNGEON3_CENTER.z - ARENA3_RADIUS + 3);
+
+function startDungeon3(){
+  if(dungeonState3.transitioning || player.inDungeon) return;
+  if(!checkDungeonLevelGate('dungeon3')) return;
+  dungeonState3.transitioning = true;
+  SFX.portal();
+  fadeTransition(()=>{
+    player.inDungeon = true;
+    setAtmosphere(true);
+    dungeonState3.active = true;
+    dungeonState3.wave = 0;
+    dungeonState3.bossSpawned = false;
+    dungeonState3.bossAlive = false;
+    dungeonState3.cleared = false;
+    playerState.pos.copy(DUNGEON3_ENTRY);
+    playerState.moveTarget = null; playerState.targetMonster = null;
+    playerMesh.position.copy(playerState.pos);
+    camera.position.copy(playerState.pos).add(CAM_OFFSET);
+    dungeonState3.transitioning = false;
+    spawnWave3(1);
+  });
+}
+
+function exitDungeon3(){
+  if(dungeonState3.transitioning || !player.inDungeon || !dungeonState3.active) return;
+  dungeonState3.transitioning = true;
+  SFX.portal();
+  fadeTransition(()=>{
+    player.inDungeon = false;
+    setAtmosphere(false);
+    dungeonState3.active = false;
+    monsters.filter(m=>m.isDungeon).forEach(m=>removeMonster(m));
+    chestDrops.forEach(c=>scene.remove(c.mesh)); chestDrops.length = 0;
+    playerState.pos.set(TOWN2_CENTER.x, 0, TOWN2_CENTER.z+38);
+    playerState.moveTarget = null; playerState.targetMonster = null;
+    playerMesh.position.copy(playerState.pos);
+    camera.position.copy(playerState.pos).add(CAM_OFFSET);
+    dungeonState3.transitioning = false;
+  });
+}
+
+function spawnWave3(n){
+  dungeonState3.wave = n;
+  showWaveBanner(`웨이브 ${n} / ${DUNGEON3_TOTAL_WAVES}`);
+  const count = 2 + n;
+  const hpMult = 1.8 + (n-1)*0.5;
+  const atkMult = 1.5 + (n-1)*0.28;
+  const seaghostW = 0.18 + n*0.04, drownedW = 0.42;
+  for(let i=0;i<count;i++){
+    let x,z, tries=0;
+    do{
+      const angle = rand(0,Math.PI*2), r = rand(3,ARENA3_RADIUS-3);
+      x = DUNGEON3_CENTER.x + Math.cos(angle)*r;
+      z = DUNGEON3_CENTER.z + Math.sin(angle)*r;
+      tries++;
+    }while(Math.hypot(x-DUNGEON3_ENTRY.x, z-DUNGEON3_ENTRY.z) < 7 && tries < 10);
+    const roll = Math.random();
+    const type = roll<seaghostW ? 'seaghost' : roll<seaghostW+drownedW ? 'drowned' : 'orc';
+    spawnMonster(type, x, z, { isDungeon:true, hpMult, atkMult });
+  }
+}
+
+function onDungeon3MonsterKilled(){
+  if(!dungeonState3.active) return;
+  const remaining = monsters.filter(m=>m.isDungeon).length;
+  if(remaining > 0) return;
+
+  if(dungeonState3.bossSpawned && !dungeonState3.cleared){
+    dungeonState3.cleared = true;
+    dungeonState3.bossAlive = false;
+    SFX.waveClear();
+    showWaveBanner('침몰한 유적 클리어! 보상을 확인하세요');
+    spawnChest(DUNGEON3_CENTER.x, DUNGEON3_CENTER.z);
+    spawnChest(DUNGEON3_CENTER.x + 1.4, DUNGEON3_CENTER.z);
+    questProgressDungeonClear3();
+    return;
+  }
+
+  if(dungeonState3.wave < DUNGEON3_TOTAL_WAVES){
+    SFX.waveClear();
+    setTimeout(()=>{ if(dungeonState3.active) spawnWave3(dungeonState3.wave+1); }, 1800);
+  } else if(!dungeonState3.bossSpawned){
+    SFX.waveClear();
+    showWaveBanner('보스 출현!');
+    setTimeout(()=>{
+      if(!dungeonState3.active) return;
+      dungeonState3.bossSpawned = true;
+      dungeonState3.bossAlive = true;
+      spawnMonster('pirateking', DUNGEON3_CENTER.x, DUNGEON3_CENTER.z - 4, { isDungeon:true, nameOverride:'잊혀진 해적왕' });
+    }, 2000);
+  }
+}
+
+function updatePortals3(dt){
+  entrancePortal3.userData.ring.rotation.z += dt*0.6;
+  exitPortal3.userData.ring.rotation.z += dt*0.6;
+
+  if(!player.inDungeon && !dungeonState3.transitioning && player.alive){
+    if(playerState.pos.distanceTo(entrancePortal3.position) < 2.2) startDungeon3();
+  }
+  if(player.inDungeon && dungeonState3.active && !dungeonState3.transitioning && player.alive){
+    if(playerState.pos.distanceTo(exitPortal3.position) < 2.2) exitDungeon3();
+  }
+
+  projectLabel(entranceLabel3, entrancePortal3.position, 2.6);
+  projectLabel(exitLabel3, exitPortal3.position, 2.6);
+}
+
+/* ---------------------------- 던전 4: 모래 무덤 (사막 마을 소속) ---------------------------- */
+
+const DUNGEON4_CENTER = new THREE.Vector3(TOWN3_CENTER.x, 0, TOWN3_CENTER.z-1000);
+const ARENA4_RADIUS = 19;
+const DUNGEON4_TOTAL_WAVES = 4;
+const dungeonState4 = { active:false, wave:0, bossSpawned:false, bossAlive:false, cleared:false, transitioning:false };
+
+const entrancePortal4 = makePortal(0xe0a83a);
+entrancePortal4.position.set(TOWN3_CENTER.x, 0, TOWN3_CENTER.z-42);
+scene.add(entrancePortal4);
+const entranceLabel4 = makePortalLabel('🌀 모래 무덤');
+
+let arenaGround4 = null;
+function buildArena4(){
+  arenaGround4 = new THREE.Mesh(
+    new THREE.CircleGeometry(ARENA4_RADIUS, 42),
+    new THREE.MeshStandardMaterial({ color:0x5a4a2a })
+  );
+  arenaGround4.rotation.x = -Math.PI/2;
+  arenaGround4.position.copy(DUNGEON4_CENTER);
+  arenaGround4.receiveShadow = true;
+  scene.add(arenaGround4);
+
+  const pillarCount = 15;
+  for(let i=0;i<pillarCount;i++){
+    const angle = (i/pillarCount)*Math.PI*2;
+    const px = DUNGEON4_CENTER.x + Math.cos(angle)*(ARENA4_RADIUS+0.6);
+    const pz = DUNGEON4_CENTER.z + Math.sin(angle)*(ARENA4_RADIUS+0.6);
+    const pillar = new THREE.Mesh(new THREE.CylinderGeometry(0.5,0.65,4.2,8), new THREE.MeshStandardMaterial({color:0x3a2e18}));
+    pillar.position.set(px,2.1,pz); pillar.castShadow = true;
+    scene.add(pillar);
+  }
+  const torchLight = new THREE.PointLight(0xe0a83a, 1.8, 36);
+  torchLight.position.set(DUNGEON4_CENTER.x, 8.5, DUNGEON4_CENTER.z);
+  scene.add(torchLight);
+  const ringTorchCount = 4;
+  for(let i=0;i<ringTorchCount;i++){
+    const angle = (i/ringTorchCount)*Math.PI*2 + Math.PI/4;
+    const tx = DUNGEON4_CENTER.x + Math.cos(angle)*(ARENA4_RADIUS*0.6);
+    const tz = DUNGEON4_CENTER.z + Math.sin(angle)*(ARENA4_RADIUS*0.6);
+    const ringTorch = new THREE.PointLight(0xe0a83a, 1.1, 22);
+    ringTorch.position.set(tx, 5, tz);
+    scene.add(ringTorch);
+  }
+}
+buildArena4();
+
+const exitPortal4 = makePortal(0x4dd9ff);
+exitPortal4.position.set(DUNGEON4_CENTER.x, 0, DUNGEON4_CENTER.z + ARENA4_RADIUS - 2.5);
+scene.add(exitPortal4);
+const exitLabel4 = makePortalLabel('🌀 귀환 포탈');
+
+const DUNGEON4_ENTRY = new THREE.Vector3(DUNGEON4_CENTER.x, 0, DUNGEON4_CENTER.z - ARENA4_RADIUS + 3);
+
+function startDungeon4(){
+  if(dungeonState4.transitioning || player.inDungeon) return;
+  if(!checkDungeonLevelGate('dungeon4')) return;
+  dungeonState4.transitioning = true;
+  SFX.portal();
+  fadeTransition(()=>{
+    player.inDungeon = true;
+    setAtmosphere(true);
+    dungeonState4.active = true;
+    dungeonState4.wave = 0;
+    dungeonState4.bossSpawned = false;
+    dungeonState4.bossAlive = false;
+    dungeonState4.cleared = false;
+    playerState.pos.copy(DUNGEON4_ENTRY);
+    playerState.moveTarget = null; playerState.targetMonster = null;
+    playerMesh.position.copy(playerState.pos);
+    camera.position.copy(playerState.pos).add(CAM_OFFSET);
+    dungeonState4.transitioning = false;
+    spawnWave4(1);
+  });
+}
+
+function exitDungeon4(){
+  if(dungeonState4.transitioning || !player.inDungeon || !dungeonState4.active) return;
+  dungeonState4.transitioning = true;
+  SFX.portal();
+  fadeTransition(()=>{
+    player.inDungeon = false;
+    setAtmosphere(false);
+    dungeonState4.active = false;
+    monsters.filter(m=>m.isDungeon).forEach(m=>removeMonster(m));
+    chestDrops.forEach(c=>scene.remove(c.mesh)); chestDrops.length = 0;
+    playerState.pos.set(TOWN3_CENTER.x, 0, TOWN3_CENTER.z-38);
+    playerState.moveTarget = null; playerState.targetMonster = null;
+    playerMesh.position.copy(playerState.pos);
+    camera.position.copy(playerState.pos).add(CAM_OFFSET);
+    dungeonState4.transitioning = false;
+  });
+}
+
+function spawnWave4(n){
+  dungeonState4.wave = n;
+  showWaveBanner(`웨이브 ${n} / ${DUNGEON4_TOTAL_WAVES}`);
+  const count = 2 + n;
+  const hpMult = 2.0 + (n-1)*0.55;
+  const atkMult = 1.65 + (n-1)*0.3;
+  const sandwraithW = 0.18 + n*0.04, scarabW = 0.42;
+  for(let i=0;i<count;i++){
+    let x,z, tries=0;
+    do{
+      const angle = rand(0,Math.PI*2), r = rand(3,ARENA4_RADIUS-3);
+      x = DUNGEON4_CENTER.x + Math.cos(angle)*r;
+      z = DUNGEON4_CENTER.z + Math.sin(angle)*r;
+      tries++;
+    }while(Math.hypot(x-DUNGEON4_ENTRY.x, z-DUNGEON4_ENTRY.z) < 7 && tries < 10);
+    const roll = Math.random();
+    const type = roll<sandwraithW ? 'sandwraith' : roll<sandwraithW+scarabW ? 'scarab' : 'archer';
+    spawnMonster(type, x, z, { isDungeon:true, hpMult, atkMult });
+  }
+}
+
+function onDungeon4MonsterKilled(){
+  if(!dungeonState4.active) return;
+  const remaining = monsters.filter(m=>m.isDungeon).length;
+  if(remaining > 0) return;
+
+  if(dungeonState4.bossSpawned && !dungeonState4.cleared){
+    dungeonState4.cleared = true;
+    dungeonState4.bossAlive = false;
+    SFX.waveClear();
+    showWaveBanner('모래 무덤 클리어! 보상을 확인하세요');
+    spawnChest(DUNGEON4_CENTER.x, DUNGEON4_CENTER.z);
+    spawnChest(DUNGEON4_CENTER.x + 1.4, DUNGEON4_CENTER.z);
+    questProgressDungeonClear4();
+    return;
+  }
+
+  if(dungeonState4.wave < DUNGEON4_TOTAL_WAVES){
+    SFX.waveClear();
+    setTimeout(()=>{ if(dungeonState4.active) spawnWave4(dungeonState4.wave+1); }, 1800);
+  } else if(!dungeonState4.bossSpawned){
+    SFX.waveClear();
+    showWaveBanner('보스 출현!');
+    setTimeout(()=>{
+      if(!dungeonState4.active) return;
+      dungeonState4.bossSpawned = true;
+      dungeonState4.bossAlive = true;
+      spawnMonster('pharaoh', DUNGEON4_CENTER.x, DUNGEON4_CENTER.z - 4, { isDungeon:true, nameOverride:'파라오의 저주' });
+    }, 2000);
+  }
+}
+
+function updatePortals4(dt){
+  entrancePortal4.userData.ring.rotation.z += dt*0.6;
+  exitPortal4.userData.ring.rotation.z += dt*0.6;
+
+  if(!player.inDungeon && !dungeonState4.transitioning && player.alive){
+    if(playerState.pos.distanceTo(entrancePortal4.position) < 2.2) startDungeon4();
+  }
+  if(player.inDungeon && dungeonState4.active && !dungeonState4.transitioning && player.alive){
+    if(playerState.pos.distanceTo(exitPortal4.position) < 2.2) exitDungeon4();
+  }
+
+  projectLabel(entranceLabel4, entrancePortal4.position, 2.6);
+  projectLabel(exitLabel4, exitPortal4.position, 2.6);
+}
+
+/* ---------------------------- 마을 간 이동 (여행) ---------------------------- */
+
+// 던전별 최소/권장 레벨 (마을·던전 난이도 곡선을 명시적으로 강제)
+const DUNGEON_LEVEL_REQS = {
+  dungeon1: { minLevel:1,  recLevel:8,  name:'오크 소굴' },
+  dungeon2: { minLevel:12, recLevel:16, name:'심연의 균열' },
+  dungeon3: { minLevel:18, recLevel:22, name:'침몰한 유적' },
+  dungeon4: { minLevel:24, recLevel:28, name:'모래 무덤' },
+};
+const levelGateWarnCooldowns = {};
+function checkDungeonLevelGate(key){
+  const req = DUNGEON_LEVEL_REQS[key];
+  const now = performance.now();
+  if(player.level < req.minLevel){
+    if(!(levelGateWarnCooldowns[key] > now)){
+      spawnToast(`🔒 ${req.name} 입장에는 Lv.${req.minLevel} 이상이 필요합니다`, '#ff8a2a');
+      levelGateWarnCooldowns[key] = now + 3000;
+    }
+    return false;
+  }
+  if(player.level < req.recLevel && !(levelGateWarnCooldowns[key+'_rec'] > now)){
+    spawnToast(`⚠ 권장 레벨 Lv.${req.recLevel} 미만입니다. 주의하세요`, '#ffd84a');
+    levelGateWarnCooldowns[key+'_rec'] = now + 12000;
+  }
+  return true;
+}
+
+const TOWNS = {
+  town1: { id:'town1', name:'크로노스 마을', spawnPos:new THREE.Vector3(0,0,5), minLevel:1, recLevel:1 },
+  town2: { id:'town2', name:'항만 마을',     spawnPos:new THREE.Vector3(TOWN2_CENTER.x,0,TOWN2_CENTER.z+5), minLevel:8, recLevel:12 },
+  town3: { id:'town3', name:'사막 마을',     spawnPos:new THREE.Vector3(TOWN3_CENTER.x,0,TOWN3_CENTER.z+5), minLevel:16, recLevel:20 },
+};
+
+function travelToTown(townId){
+  if(player.inDungeon){ spawnToast('던전에서는 이동할 수 없습니다', '#888'); return; }
+  const town = TOWNS[townId];
+  if(!town || player.currentTown === townId) return;
+  if(player.level < town.minLevel){
+    spawnToast(`🔒 ${town.name} 이동에는 Lv.${town.minLevel} 이상이 필요합니다`, '#ff8a2a');
+    return;
+  }
+  SFX.portal();
+  fadeTransition(()=>{
+    player.currentTown = townId;
+    playerState.pos.copy(town.spawnPos);
+    playerState.moveTarget = null; playerState.targetMonster = null;
+    playerMesh.position.copy(playerState.pos);
+    camera.position.copy(playerState.pos).add(CAM_OFFSET);
+    spawnToast(`${town.name}(으)로 이동했습니다`, '#8ad8ff');
+    if(player.level < town.recLevel){
+      spawnToast(`⚠ 권장 레벨 Lv.${town.recLevel} 미만입니다. 주의하세요`, '#ffd84a');
+    }
+    refreshHUD();
+    saveGame(true);
+  });
+}
+
 /* ---------------------------- NPC 상호작용 ---------------------------- */
 
 const INTERACT_RANGE = 2.6;
@@ -2578,7 +3087,7 @@ const questLogPanel = document.getElementById('quest-log-panel');
 const codexPanel = document.getElementById('codex-panel');
 
 function isAnyPanelOpen(){
-  return !invPanel.classList.contains('hidden') || !npcPanel.classList.contains('hidden') || !questLogPanel.classList.contains('hidden') || !codexPanel.classList.contains('hidden') || !document.getElementById('stat-panel').classList.contains('hidden') || !document.getElementById('skilltree-panel').classList.contains('hidden') || !document.getElementById('combine-panel').classList.contains('hidden');
+  return !invPanel.classList.contains('hidden') || !npcPanel.classList.contains('hidden') || !questLogPanel.classList.contains('hidden') || !codexPanel.classList.contains('hidden') || !document.getElementById('stat-panel').classList.contains('hidden') || !document.getElementById('skilltree-panel').classList.contains('hidden') || !document.getElementById('combine-panel').classList.contains('hidden') || !document.getElementById('travel-panel').classList.contains('hidden');
 }
 
 function updateNPCs(dt){
@@ -2630,7 +3139,7 @@ function renderNPCContent(npc){
     container.appendChild(card);
   }
 
-  if(npc.role === 'merchant'){
+  if(['merchant','harbor_merchant','desert_merchant'].includes(npc.role)){
     hasContent = true;
     const row = document.createElement('div');
     row.className = 'shop-row';
@@ -2776,6 +3285,32 @@ function questProgressDungeonClear2(){
     if(qs.status !== 'active') continue;
     const qd = QUEST_DEFS[id];
     if(qd.type === 'dungeonClear2'){
+      qs.progress = qd.required;
+      spawnToast(`퀘스트 완료 가능: ${qd.title}`, '#5cff8a');
+      refreshQuestTracker();
+    }
+  }
+}
+
+function questProgressDungeonClear3(){
+  for(const id in player.quests){
+    const qs = player.quests[id];
+    if(qs.status !== 'active') continue;
+    const qd = QUEST_DEFS[id];
+    if(qd.type === 'dungeonClear3'){
+      qs.progress = qd.required;
+      spawnToast(`퀘스트 완료 가능: ${qd.title}`, '#5cff8a');
+      refreshQuestTracker();
+    }
+  }
+}
+
+function questProgressDungeonClear4(){
+  for(const id in player.quests){
+    const qs = player.quests[id];
+    if(qs.status !== 'active') continue;
+    const qd = QUEST_DEFS[id];
+    if(qd.type === 'dungeonClear4'){
       qs.progress = qd.required;
       spawnToast(`퀘스트 완료 가능: ${qd.title}`, '#5cff8a');
       refreshQuestTracker();
@@ -3343,6 +3878,39 @@ document.querySelectorAll('.combine-tab').forEach(btn=>{
   });
 });
 
+/* ---------------------------- 마을 이동 패널 ---------------------------- */
+
+const travelPanel = document.getElementById('travel-panel');
+
+function renderTravelPanel(){
+  const rows = document.getElementById('travel-rows');
+  const inDungeon = player.inDungeon;
+  rows.innerHTML = Object.values(TOWNS).map(t=>{
+    const isCurrent = player.currentTown === t.id;
+    const belowMin = player.level < t.minLevel;
+    const belowRec = player.level < t.recLevel;
+    const reqText = t.minLevel<=1 ? '' :
+      `<div class="travel-row-req ${belowMin?'unmet':''}">최소 Lv.${t.minLevel} · 권장 Lv.${t.recLevel}</div>`;
+    return `<div class="travel-row">
+      <div><span class="travel-row-name">${t.name}${isCurrent?' (현재 위치)':''}</span>${reqText}</div>
+      <button class="travel-row-btn" data-town="${t.id}" ${(isCurrent||inDungeon||belowMin)?'disabled':''}>이동하기</button>
+    </div>`;
+  }).join('');
+  if(inDungeon){
+    rows.innerHTML = '<div class="combine-empty">던전 안에서는 마을로 이동할 수 없습니다. 먼저 귀환 포탈로 나가세요.</div>' + rows.innerHTML;
+  }
+  rows.querySelectorAll('.travel-row-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{ travelToTown(btn.dataset.town); toggleTravelPanel(); });
+  });
+}
+
+function toggleTravelPanel(){
+  travelPanel.classList.toggle('hidden');
+  if(!travelPanel.classList.contains('hidden')) renderTravelPanel();
+}
+document.getElementById('travel-close').addEventListener('click', toggleTravelPanel);
+document.getElementById('btn-travel').addEventListener('click', toggleTravelPanel);
+
 /* ---------------------------- 입력 처리 ---------------------------- */
 
 const raycaster = new THREE.Raycaster();
@@ -3381,7 +3949,13 @@ canvas.addEventListener('pointerdown', (e)=>{
     }
   }
 
-  const floorMesh = dungeonState2.active && arenaGround2 ? arenaGround2 : (player.inDungeon && arenaGround ? arenaGround : ground);
+  let floorMesh = ground;
+  if(dungeonState2.active && arenaGround2) floorMesh = arenaGround2;
+  else if(dungeonState3.active && arenaGround3) floorMesh = arenaGround3;
+  else if(dungeonState4.active && arenaGround4) floorMesh = arenaGround4;
+  else if(player.inDungeon && arenaGround) floorMesh = arenaGround;
+  else if(player.currentTown === 'town2' && townGround2) floorMesh = townGround2;
+  else if(player.currentTown === 'town3' && townGround3) floorMesh = townGround3;
   const groundHits = raycaster.intersectObject(floorMesh);
   if(groundHits.length>0){
     playerState.moveTarget = groundHits[0].point.clone();
@@ -3407,6 +3981,7 @@ window.addEventListener('keydown', (e)=>{
   if(matchKey(e,'KeyC','c')) toggleStatPanel();
   if(matchKey(e,'KeyV','v')) toggleSkillTree();
   if(matchKey(e,'KeyG','g')) toggleCombinePanel();
+  if(matchKey(e,'KeyT','t')) toggleTravelPanel();
   if(matchKey(e,'KeyR','r')) toggleMount();
 });
 document.getElementById('slot-potion').addEventListener('click', usePotion);
@@ -3517,7 +4092,7 @@ function killMonster(monster){
   if(playerState.targetMonster === monster) playerState.targetMonster = null;
   const wasDungeon = monster.isDungeon;
   removeMonster(monster);
-  if(wasDungeon){ onDungeonMonsterKilled(); onDungeon2MonsterKilled(); }
+  if(wasDungeon){ onDungeonMonsterKilled(); onDungeon2MonsterKilled(); onDungeon3MonsterKilled(); onDungeon4MonsterKilled(); }
 }
 
 function forceGoodItem(){
@@ -3570,11 +4145,14 @@ document.getElementById('btn-respawn').addEventListener('click', ()=>{
     setAtmosphere(false);
     dungeonState.active = false;
     dungeonState2.active = false;
+    dungeonState3.active = false;
+    dungeonState4.active = false;
     monsters.filter(m=>m.isDungeon).forEach(m=>removeMonster(m));
     chestDrops.forEach(c=>scene.remove(c.mesh)); chestDrops.length = 0;
   }
-  playerState.pos.set(0,0,0);
-  playerMesh.position.set(0,0,0);
+  const respawnPos = TOWNS[player.currentTown] ? TOWNS[player.currentTown].spawnPos : new THREE.Vector3(0,0,0);
+  playerState.pos.copy(respawnPos);
+  playerMesh.position.copy(respawnPos);
   camera.position.copy(playerState.pos).add(CAM_OFFSET);
   document.getElementById('death-screen').classList.add('hidden');
   refreshHUD();
@@ -3602,6 +4180,8 @@ function animate(){
   updateChestPickup();
   updatePortals(dt);
   updatePortals2(dt);
+  updatePortals3(dt);
+  updatePortals4(dt);
   updateNPCs(dt);
   updatePet(dt);
   updateBars();
@@ -4064,6 +4644,7 @@ function saveGame(force){
     junkThreshold: player.junkThreshold,
     skillPoints: player.skillPoints,
     skillRanks: player.skillRanks,
+    currentTown: player.currentTown,
   };
   try{ localStorage.setItem(SAVE_KEY, JSON.stringify(data)); }catch(e){ /* 저장 공간 없음: 무시 */ }
 }
@@ -4098,6 +4679,7 @@ function loadGame(){
     player.skillRanks = data.skillRanks
       ? Object.assign({ s1:0, s2:0, s3:0, s5:0 }, data.skillRanks)
       : { s1:1, s2:1, s3:1, s5:0 };
+    player.currentTown = TOWNS[data.currentTown] ? data.currentTown : 'town1';
     player.hp = player.baseHp;
     player.mp = player.baseMp;
 
@@ -4237,12 +4819,18 @@ function updateMinimap(){
   });
   if(dungeonState2.active){
     addDot(exitPortal2.position.x, exitPortal2.position.z, 'mm-portal');
+  } else if(dungeonState3.active){
+    addDot(exitPortal3.position.x, exitPortal3.position.z, 'mm-portal');
+  } else if(dungeonState4.active){
+    addDot(exitPortal4.position.x, exitPortal4.position.z, 'mm-portal');
   } else if(player.inDungeon){
     addDot(exitPortal.position.x, exitPortal.position.z, 'mm-portal');
   } else {
     npcs.forEach(n=> addDot(n.pos.x, n.pos.z, 'mm-npc'));
     addDot(entrancePortal.position.x, entrancePortal.position.z, 'mm-portal');
     addDot(entrancePortal2.position.x, entrancePortal2.position.z, 'mm-portal');
+    addDot(entrancePortal3.position.x, entrancePortal3.position.z, 'mm-portal');
+    addDot(entrancePortal4.position.x, entrancePortal4.position.z, 'mm-portal');
   }
   const pdot = document.createElement('div');
   pdot.className = 'mm-dot mm-player';
