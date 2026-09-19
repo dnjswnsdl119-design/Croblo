@@ -2791,6 +2791,11 @@ function startDungeon(){
     dungeonState.bossAlive = false;
     dungeonState.cleared = false;
     dungeonState.difficulty = player.dungeonDifficulty;
+    dungeonState.modifier = rollDungeonModifier().id;
+    if(dungeonState.modifier !== 'none'){
+      const mod = DUNGEON_MODIFIERS.find(m=>m.id===dungeonState.modifier);
+      spawnToast(`${mod.icon} 던전 모디파이어: ${mod.label} — ${mod.desc}`, mod.color);
+    }
     playerState.pos.set(DUNGEON_CENTER.x, 0, DUNGEON_CENTER.z - ARENA_RADIUS + 3);
     playerState.moveTarget = null; playerState.targetMonster = null;
     playerMesh.position.copy(playerState.pos);
@@ -2822,8 +2827,8 @@ const DUNGEON_ENTRY = new THREE.Vector3(DUNGEON_CENTER.x, 0, DUNGEON_CENTER.z - 
 
 function spawnWave(n){
   dungeonState.wave = n;
-  const diff = getDifficultyDef(dungeonState.difficulty);
-  showWaveBanner(`웨이브 ${n} / ${DUNGEON_TOTAL_WAVES}${diff.id!=='normal'?` · ${diff.label}`:''}`);
+  const diff = getEffectiveDifficulty(dungeonState);
+  showWaveBanner(`웨이브 ${n} / ${DUNGEON_TOTAL_WAVES}${diff.id!=='normal'?` · ${diff.label}`:''}${diff.modifier?` · ${diff.modifier.icon}${diff.modifier.label}`:''}`);
   const count = 1 + n; // 웨이브1: 2마리, 웨이브2: 3마리, 웨이브3: 4마리 (점진적 증가)
   const hpMult = (1 + (n-1)*0.35) * diff.hpMult;
   const atkMult = (1 + (n-1)*0.2) * diff.atkMult;
@@ -2867,7 +2872,7 @@ function onDungeonMonsterKilled(){
       if(!dungeonState.active) return;
       dungeonState.bossSpawned = true;
       dungeonState.bossAlive = true;
-      { const diff = getDifficultyDef(dungeonState.difficulty);
+      { const diff = getEffectiveDifficulty(dungeonState);
       spawnMonster('orclord', DUNGEON_CENTER.x, DUNGEON_CENTER.z - 4, { isDungeon:true, nameOverride:'오크 군주', hpMult:diff.hpMult, atkMult:diff.atkMult, dropMult:diff.dropMult, goldMult:diff.goldMult }); }
     }, 2000);
   }
@@ -3022,6 +3027,11 @@ function startDungeon2(){
     dungeonState2.bossAlive = false;
     dungeonState2.cleared = false;
     dungeonState2.difficulty = player.dungeonDifficulty;
+    dungeonState2.modifier = rollDungeonModifier().id;
+    if(dungeonState2.modifier !== 'none'){
+      const mod = DUNGEON_MODIFIERS.find(m=>m.id===dungeonState2.modifier);
+      spawnToast(`${mod.icon} 던전 모디파이어: ${mod.label} — ${mod.desc}`, mod.color);
+    }
     playerState.pos.copy(DUNGEON2_ENTRY);
     playerState.moveTarget = null; playerState.targetMonster = null;
     playerMesh.position.copy(playerState.pos);
@@ -3051,8 +3061,8 @@ function exitDungeon2(){
 
 function spawnWave2(n){
   dungeonState2.wave = n;
-  const diff = getDifficultyDef(dungeonState2.difficulty);
-  showWaveBanner(`웨이브 ${n} / ${DUNGEON2_TOTAL_WAVES}${diff.id!=='normal'?` · ${diff.label}`:''}`);
+  const diff = getEffectiveDifficulty(dungeonState2);
+  showWaveBanner(`웨이브 ${n} / ${DUNGEON2_TOTAL_WAVES}${diff.id!=='normal'?` · ${diff.label}`:''}${diff.modifier?` · ${diff.modifier.icon}${diff.modifier.label}`:''}`);
   const count = 2 + n;
   const hpMult = (1.6 + (n-1)*0.45) * diff.hpMult;
   const atkMult = (1.4 + (n-1)*0.25) * diff.atkMult;
@@ -3097,7 +3107,7 @@ function onDungeon2MonsterKilled(){
       if(!dungeonState2.active) return;
       dungeonState2.bossSpawned = true;
       dungeonState2.bossAlive = true;
-      { const diff = getDifficultyDef(dungeonState2.difficulty);
+      { const diff = getEffectiveDifficulty(dungeonState2);
       spawnMonster('abysslord', DUNGEON2_CENTER.x, DUNGEON2_CENTER.z - 4, { isDungeon:true, nameOverride:'심연의 지배자', hpMult:diff.hpMult, atkMult:diff.atkMult, dropMult:diff.dropMult, goldMult:diff.goldMult }); }
     }, 2000);
   }
@@ -3276,6 +3286,11 @@ function startDungeon3(){
     dungeonState3.bossAlive = false;
     dungeonState3.cleared = false;
     dungeonState3.difficulty = player.dungeonDifficulty;
+    dungeonState3.modifier = rollDungeonModifier().id;
+    if(dungeonState3.modifier !== 'none'){
+      const mod = DUNGEON_MODIFIERS.find(m=>m.id===dungeonState3.modifier);
+      spawnToast(`${mod.icon} 던전 모디파이어: ${mod.label} — ${mod.desc}`, mod.color);
+    }
     playerState.pos.copy(DUNGEON3_ENTRY);
     playerState.moveTarget = null; playerState.targetMonster = null;
     playerMesh.position.copy(playerState.pos);
@@ -3305,8 +3320,8 @@ function exitDungeon3(){
 
 function spawnWave3(n){
   dungeonState3.wave = n;
-  const diff = getDifficultyDef(dungeonState3.difficulty);
-  showWaveBanner(`웨이브 ${n} / ${DUNGEON3_TOTAL_WAVES}${diff.id!=='normal'?` · ${diff.label}`:''}`);
+  const diff = getEffectiveDifficulty(dungeonState3);
+  showWaveBanner(`웨이브 ${n} / ${DUNGEON3_TOTAL_WAVES}${diff.id!=='normal'?` · ${diff.label}`:''}${diff.modifier?` · ${diff.modifier.icon}${diff.modifier.label}`:''}`);
   const count = 2 + n;
   const hpMult = (1.8 + (n-1)*0.5) * diff.hpMult;
   const atkMult = (1.5 + (n-1)*0.28) * diff.atkMult;
@@ -3351,7 +3366,7 @@ function onDungeon3MonsterKilled(){
       if(!dungeonState3.active) return;
       dungeonState3.bossSpawned = true;
       dungeonState3.bossAlive = true;
-      { const diff = getDifficultyDef(dungeonState3.difficulty);
+      { const diff = getEffectiveDifficulty(dungeonState3);
       spawnMonster('pirateking', DUNGEON3_CENTER.x, DUNGEON3_CENTER.z - 4, { isDungeon:true, nameOverride:'잊혀진 해적왕', hpMult:diff.hpMult, atkMult:diff.atkMult, dropMult:diff.dropMult, goldMult:diff.goldMult }); }
     }, 2000);
   }
@@ -3440,6 +3455,11 @@ function startDungeon4(){
     dungeonState4.bossAlive = false;
     dungeonState4.cleared = false;
     dungeonState4.difficulty = player.dungeonDifficulty;
+    dungeonState4.modifier = rollDungeonModifier().id;
+    if(dungeonState4.modifier !== 'none'){
+      const mod = DUNGEON_MODIFIERS.find(m=>m.id===dungeonState4.modifier);
+      spawnToast(`${mod.icon} 던전 모디파이어: ${mod.label} — ${mod.desc}`, mod.color);
+    }
     playerState.pos.copy(DUNGEON4_ENTRY);
     playerState.moveTarget = null; playerState.targetMonster = null;
     playerMesh.position.copy(playerState.pos);
@@ -3469,8 +3489,8 @@ function exitDungeon4(){
 
 function spawnWave4(n){
   dungeonState4.wave = n;
-  const diff = getDifficultyDef(dungeonState4.difficulty);
-  showWaveBanner(`웨이브 ${n} / ${DUNGEON4_TOTAL_WAVES}${diff.id!=='normal'?` · ${diff.label}`:''}`);
+  const diff = getEffectiveDifficulty(dungeonState4);
+  showWaveBanner(`웨이브 ${n} / ${DUNGEON4_TOTAL_WAVES}${diff.id!=='normal'?` · ${diff.label}`:''}${diff.modifier?` · ${diff.modifier.icon}${diff.modifier.label}`:''}`);
   const count = 2 + n;
   const hpMult = (2.0 + (n-1)*0.55) * diff.hpMult;
   const atkMult = (1.65 + (n-1)*0.3) * diff.atkMult;
@@ -3515,7 +3535,7 @@ function onDungeon4MonsterKilled(){
       if(!dungeonState4.active) return;
       dungeonState4.bossSpawned = true;
       dungeonState4.bossAlive = true;
-      { const diff = getDifficultyDef(dungeonState4.difficulty);
+      { const diff = getEffectiveDifficulty(dungeonState4);
       spawnMonster('pharaoh', DUNGEON4_CENTER.x, DUNGEON4_CENTER.z - 4, { isDungeon:true, nameOverride:'파라오의 저주', hpMult:diff.hpMult, atkMult:diff.atkMult, dropMult:diff.dropMult, goldMult:diff.goldMult }); }
     }, 2000);
   }
@@ -3553,6 +3573,32 @@ const DUNGEON_DIFFICULTIES = {
   nightmare: { id:'nightmare', label:'나이트메어', hpMult:2.5, atkMult:1.7, dropMult:2.2, goldMult:1.7, color:'#ff6a4a' },
 };
 const DUNGEON_DIFFICULTY_ORDER = ['normal','hard','nightmare'];
+// 던전 랜덤 모디파이어: 입장할 때마다 확률적으로 하나가 걸리며, 난이도 배율 위에 추가로 곱해진다 (대부분은 'none'이라 가끔 등장하는 이벤트처럼 느껴지도록 가중치 설계)
+const DUNGEON_MODIFIERS = [
+  { id:'none',      label:'',      icon:'',   hpMult:1,    atkMult:1,   dropMult:1,   goldMult:1,    desc:'', color:'#c9c9c9', weight:40 },
+  { id:'berserk',   label:'광폭화', icon:'🔥', hpMult:1,    atkMult:1.4, dropMult:1.2, goldMult:1.15, desc:'몬스터 공격력 +40% · 보상 소폭 증가', color:'#ff6a4a', weight:16 },
+  { id:'ironclad',  label:'철갑',  icon:'🛡️', hpMult:1.5,  atkMult:1,   dropMult:1.25,goldMult:1.15, desc:'몬스터 체력 +50% · 보상 소폭 증가', color:'#8ad8ff', weight:16 },
+  { id:'bountiful', label:'풍요',  icon:'💰', hpMult:1.15, atkMult:1.1, dropMult:1.8, goldMult:1.6,  desc:'몬스터 소폭 강화 · 드랍률/골드 대폭 증가', color:'#ffd84a', weight:12 },
+  { id:'cursed',    label:'저주',  icon:'💀', hpMult:1.3,  atkMult:1.3, dropMult:2.2, goldMult:1.5,  desc:'몬스터 대폭 강화 · 드랍률 대폭 증가 (고위험 고수익)', color:'#ff3a3a', weight:6 },
+];
+function rollDungeonModifier(){
+  const total = DUNGEON_MODIFIERS.reduce((s,m)=>s+m.weight,0);
+  let r = Math.random()*total;
+  for(const m of DUNGEON_MODIFIERS){ if(r < m.weight) return m; r -= m.weight; }
+  return DUNGEON_MODIFIERS[0];
+}
+// 플레이어가 고른 난이도 배율 x 입장 시 뽑힌 모디파이어 배율을 합쳐 실제 스폰에 쓰일 배율을 계산한다
+function getEffectiveDifficulty(state){
+  const diff = getDifficultyDef(state.difficulty);
+  const mod = state.modifier ? DUNGEON_MODIFIERS.find(m=>m.id===state.modifier) : null;
+  if(!mod || mod.id==='none') return diff;
+  return {
+    id: diff.id, label: diff.label, color: diff.color,
+    hpMult: diff.hpMult*mod.hpMult, atkMult: diff.atkMult*mod.atkMult,
+    dropMult: diff.dropMult*mod.dropMult, goldMult: diff.goldMult*mod.goldMult,
+    modifier: mod,
+  };
+}
 const levelGateWarnCooldowns = {};
 function checkDungeonLevelGate(key){
   const req = DUNGEON_LEVEL_REQS[key];
