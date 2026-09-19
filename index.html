@@ -58,30 +58,39 @@
   #controls-hint{position:absolute;bottom:14px;left:14px;color:#aaa;font-size:11px;background:rgba(0,0,0,0.5);padding:6px 10px;border-radius:4px;}
 
   /* ---------- inventory panel ---------- */
-  #inventory-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:640px;max-width:92vw;padding:16px;color:#eee;}
+  #inventory-panel{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);width:760px;max-width:94vw;max-height:88vh;padding:16px;color:#eee;display:flex;flex-direction:column;}
   #inventory-panel.hidden{display:none;}
-  #inv-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-bottom:1px solid var(--panel-border);padding-bottom:8px;gap:10px;}
+  #inv-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-bottom:1px solid var(--panel-border);padding-bottom:8px;gap:10px;flex-shrink:0;}
   #inv-header h2{margin:0;font-size:16px;color:var(--gold);flex:1;}
+  #inv-header h2 .inv-count{color:#999;font-size:12px;font-weight:normal;margin-left:6px;}
   #btn-sell-junk{padding:6px 10px;border-radius:5px;border:1px solid var(--panel-border);background:#221d15;color:var(--gold);cursor:pointer;font-size:11px;}
   #btn-sell-junk:hover{background:#332b1e;}
   #inv-close{cursor:pointer;color:#aaa;font-size:18px;background:none;border:none;}
-  #inv-body{display:flex;gap:16px;}
-  #equip-column{width:150px;flex-shrink:0;display:flex;flex-direction:column;gap:5px;}
-  .equip-slot{height:44px;border:1px dashed #555;border-radius:6px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;color:#888;cursor:pointer;position:relative;background:rgba(255,255,255,0.02);}
-  .equip-slot .slot-label{position:absolute;top:2px;left:4px;font-size:9px;color:#666;}
-  .equip-slot.filled{border-style:solid;}
+  #inv-body{display:flex;gap:18px;min-height:0;flex:1;}
+  #equip-column{width:160px;flex-shrink:0;display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
+  .equip-slot{height:48px;border:1px dashed #555;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;color:#888;cursor:pointer;position:relative;background:rgba(255,255,255,0.025);transition:background 0.15s, border-color 0.15s;}
+  .equip-slot:hover{background:rgba(255,255,255,0.07);}
+  .equip-slot .slot-icon{position:absolute;top:3px;right:5px;font-size:11px;opacity:0.5;}
+  .equip-slot .slot-label{position:absolute;top:3px;left:5px;font-size:9px;color:#666;}
+  .equip-slot.filled{border-style:solid;box-shadow:inset 0 0 10px rgba(255,255,255,0.05);}
   .item-name-small{font-size:10px;text-align:center;padding:0 4px;line-height:1.2;}
-  #grid-column{flex:1;}
-  #inv-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;}
-  .inv-slot{aspect-ratio:1;border:1px solid #3a3a3a;border-radius:5px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;padding:3px;}
-  .inv-slot:hover{background:rgba(255,255,255,0.09);}
+  #grid-column{flex:1;display:flex;flex-direction:column;min-width:0;}
+  #inv-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:7px;overflow-y:auto;padding-right:4px;align-content:start;flex:1;min-height:180px;max-height:340px;}
+  #inv-grid::-webkit-scrollbar{width:7px;}
+  #inv-grid::-webkit-scrollbar-track{background:rgba(255,255,255,0.03);border-radius:4px;}
+  #inv-grid::-webkit-scrollbar-thumb{background:#4a3f2a;border-radius:4px;}
+  #inv-grid::-webkit-scrollbar-thumb:hover{background:var(--gold);}
+  .inv-slot{aspect-ratio:1;border:1px solid #3a3a3a;border-radius:6px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;padding:3px;transition:background 0.12s, transform 0.12s, box-shadow 0.12s;}
+  .inv-slot:hover{background:rgba(255,255,255,0.1);transform:translateY(-1px);}
   .inv-slot.selected{outline:2px solid var(--gold);}
+  .inv-slot.filled{background:radial-gradient(circle at 50% 30%, var(--slot-tint,transparent) 0%, rgba(255,255,255,0.02) 75%);}
+  .inv-slot .slot-icon{position:absolute;top:2px;left:3px;font-size:10px;opacity:0.55;}
   .inv-slot .item-name-small{color:inherit;}
   .inv-slot .enh-badge{position:absolute;top:1px;right:2px;font-size:9px;color:var(--gold);font-weight:bold;}
   #char-stats{margin-top:12px;padding-top:10px;border-top:1px solid var(--panel-border);font-size:12px;line-height:1.7;display:grid;grid-template-columns:1fr 1fr;gap:2px 10px;}
 
   /* ---------- detail / enhancement panel ---------- */
-  #detail-panel{margin-top:12px;padding-top:10px;border-top:1px solid var(--panel-border);min-height:120px;}
+  #detail-panel{margin-top:12px;padding-top:10px;border-top:1px solid var(--panel-border);min-height:120px;flex-shrink:0;overflow-y:auto;max-height:280px;}
   #detail-empty{color:#666;font-size:12px;text-align:center;padding:20px 0;}
   #detail-content{display:none;}
   #detail-name{font-size:14px;font-weight:bold;margin-bottom:2px;}
@@ -146,7 +155,8 @@
   #npc-panel .npc-header h2{margin:0;font-size:16px;color:var(--gold);}
   #npc-panel .npc-close{cursor:pointer;color:#aaa;font-size:18px;background:none;border:none;}
   #npc-greeting{font-size:12px;color:#bbb;margin-bottom:12px;font-style:italic;}
-  .quest-card{border:1px solid var(--panel-border);border-radius:6px;padding:10px;margin-bottom:8px;background:rgba(255,255,255,0.03);}
+  .quest-card{border:1px solid var(--panel-border);border-radius:6px;padding:10px;margin-bottom:8px;background:rgba(255,255,255,0.03);transition:background 0.15s;}
+  .quest-card[data-qid]:hover{background:rgba(232,198,106,0.08);border-color:var(--gold);}
   .quest-card .q-title{font-weight:bold;font-size:13px;color:var(--gold);margin-bottom:3px;}
   .quest-card .q-desc{font-size:11px;color:#aaa;margin-bottom:6px;}
   .quest-card .q-reward{font-size:11px;color:#8ad8ff;margin-bottom:6px;}
@@ -498,6 +508,7 @@ const RARITY = {
 };
 
 const SLOT_LABEL = { weapon:'무기', armor:'방어구', accessory:'장신구', helmet:'투구', gloves:'장갑', boots:'신발', belt:'벨트', rune:'룬' };
+const SLOT_ICON = { weapon:'⚔️', armor:'🛡️', accessory:'💍', helmet:'⛑️', gloves:'🧤', boots:'👢', belt:'🎗️', rune:'🔮' };
 const EQUIP_SLOTS = ['weapon','helmet','armor','gloves','belt','boots','accessory'];
 
 // 세트 아이템 정의: 각 부위별 고정 아이템 + 세트 보너스
@@ -635,6 +646,11 @@ const NPC_GREETINGS = {
 /* ---------------------------- 유틸 함수 ---------------------------- */
 
 function rand(min,max){ return Math.random()*(max-min)+min; }
+function hexToRgba(hex, alpha){
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 function randi(min,max){ return Math.floor(rand(min,max+1)); }
 function choice(arr){ return arr[Math.floor(Math.random()*arr.length)]; }
 function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
@@ -824,7 +840,7 @@ const STAT_ALLOC_INFO = {
 };
 const REBIRTH_LEVEL = 20;
 const REBIRTH_BONUS_PCT = 8; // 환생 1회당 영구 능력치 증가율(%)
-const MAX_INVENTORY = 20;
+const MAX_INVENTORY = 42;
 const DISASSEMBLE_YIELD = { normal:1, magic:2, rare:3, set:4, unique:5 };
 const SELL_VALUE = { normal:8, magic:20, rare:45, set:70, unique:110, rune:25 };
 
@@ -2557,15 +2573,22 @@ function refreshQuestTracker(){
   el.innerHTML = '<div class="qt-title">📜 진행중인 퀘스트</div>' + active.map(qd=>{
     const qs = player.quests[qd.id];
     const done = qs.progress >= qd.required;
-    return `<div class="qt-item ${done?'done':''}" data-qid="${qd.id}" title="클릭: 대상 위치로 이동">${qd.title} (${qs.progress}/${qd.required})${done?' ✓':''}</div>`;
+    const hint = done ? '클릭: 보상 받기' : '클릭: 대상 위치로 이동';
+    return `<div class="qt-item ${done?'done':''}" data-qid="${qd.id}" title="${hint}">${qd.title} (${qs.progress}/${qd.required})${done?' ✓':''}</div>`;
   }).join('');
   el.querySelectorAll('.qt-item[data-qid]').forEach(row=>{
     row.addEventListener('click', ()=> trackQuest(QUEST_DEFS[row.dataset.qid]));
   });
 }
 
-// 진행중인 퀘스트를 클릭하면 대상 몬스터가 현재 존재하는 위치로 캐릭터를 이동시킨다
+// 진행중인 퀘스트를 클릭하면: 완료된 퀘스트는 즉시 보상 수령, 미완료 킬 퀘스트는 대상 위치로 이동
 function trackQuest(qd){
+  const qs = player.quests[qd.id];
+  if(qs && qs.status === 'active' && qs.progress >= qd.required){
+    turnInQuest(qd.id);
+    if(!questLogPanel.classList.contains('hidden')) toggleQuestLog();
+    return;
+  }
   if(qd.type !== 'kill'){
     spawnToast('위치를 표시할 수 없는 퀘스트입니다', '#888');
     return;
@@ -2601,10 +2624,12 @@ function renderQuestLog(){
   }
   body.innerHTML = known.map(id=>{
     const qd = QUEST_DEFS[id], qs = player.quests[id];
-    const statusText = qs.status==='turnedIn' ? '완료' : (qs.progress>=qd.required ? '완료 가능 (NPC에게 보고)' : '진행중');
-    const statusColor = qs.status==='turnedIn' ? '#5cff8a' : (qs.progress>=qd.required ? '#ffd84a' : '#8ad8ff');
-    const trackable = qs.status==='active' && qd.type==='kill';
-    return `<div class="quest-card" ${trackable?`data-qid="${qd.id}" style="cursor:pointer;" title="클릭: 대상 위치로 이동"`:''}><div class="q-title">${qd.title}</div><div class="q-desc">${qd.desc}</div>`+
+    const done = qs.progress >= qd.required;
+    const statusText = qs.status==='turnedIn' ? '완료' : (done ? '완료 가능 (클릭해서 보상 받기)' : '진행중');
+    const statusColor = qs.status==='turnedIn' ? '#5cff8a' : (done ? '#ffd84a' : '#8ad8ff');
+    const trackable = qs.status==='active' && (done || qd.type==='kill');
+    const hint = done ? '클릭: 보상 받기' : '클릭: 대상 위치로 이동';
+    return `<div class="quest-card" ${trackable?`data-qid="${qd.id}" style="cursor:pointer;" title="${hint}"`:''}><div class="q-title">${qd.title}</div><div class="q-desc">${qd.desc}</div>`+
       `<div class="q-progress" style="color:${statusColor};">${statusText} (${Math.min(qs.progress,qd.required)}/${qd.required})</div></div>`;
   }).join('');
   body.querySelectorAll('.quest-card[data-qid]').forEach(card=>{
@@ -3581,11 +3606,14 @@ function itemStatsText(item){
 }
 
 function renderInventory(){
+  const invHeader = document.querySelector('#inv-header h2');
+  if(invHeader) invHeader.innerHTML = `인벤토리 & 장비<span class="inv-count">${player.inventory.length}/${MAX_INVENTORY}</span>`;
+
   // 장비 슬롯
   document.querySelectorAll('.equip-slot').forEach(slotEl=>{
     const slot = slotEl.dataset.slot;
     const item = player.equipment[slot];
-    slotEl.innerHTML = `<span class="slot-label">${SLOT_LABEL[slot]}</span>`;
+    slotEl.innerHTML = `<span class="slot-label">${SLOT_LABEL[slot]}</span><span class="slot-icon">${SLOT_ICON[slot]||''}</span>`;
     slotEl.classList.toggle('filled', !!item);
     slotEl.style.borderColor = item ? RARITY[item.rarity].color : '#555';
     if(item){
@@ -3608,10 +3636,17 @@ function renderInventory(){
     const div = document.createElement('div');
     div.className = 'inv-slot';
     if(item){
-      div.style.borderColor = RARITY[item.rarity].color;
+      div.classList.add('filled');
+      const rc = RARITY[item.rarity].color;
+      div.style.borderColor = rc;
+      div.style.setProperty('--slot-tint', hexToRgba(rc, 0.16));
+      const iconDiv = document.createElement('div');
+      iconDiv.className = 'slot-icon';
+      iconDiv.textContent = SLOT_ICON[item.slot]||'';
+      div.appendChild(iconDiv);
       const nameDiv = document.createElement('div');
       nameDiv.className = 'item-name-small';
-      nameDiv.style.color = RARITY[item.rarity].color;
+      nameDiv.style.color = rc;
       nameDiv.textContent = item.name;
       div.appendChild(nameDiv);
       if(item.enhance>0){
