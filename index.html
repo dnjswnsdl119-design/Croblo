@@ -1077,7 +1077,7 @@ const STATUS_EFFECT_LABELS = {
 };
 const REBIRTH_LEVEL = 20;
 const REBIRTH_BONUS_PCT = 8; // 환생 1회당 영구 능력치 증가율(%)
-const MAX_INVENTORY = 42;
+const MAX_INVENTORY = 100;
 const DISASSEMBLE_YIELD = { normal:1, magic:2, rare:3, set:4, unique:5 };
 const SELL_VALUE = { normal:8, magic:20, rare:45, set:70, unique:110, rune:25 };
 const GEM_SELL_VALUE = { chipped:6, normal:14, flawless:30, perfect:60 };
@@ -1292,7 +1292,7 @@ function warnInventoryFull(){
 }
 
 function addItemToInventory(item){
-  if(player.inventory.length >= MAX_INVENTORY){
+  if(!inventoryHasRoomFor(item)){
     warnInventoryFull();
     return false;
   }
@@ -2205,7 +2205,7 @@ function monsterShootProjectile(m){
   scene.add(mesh);
   projectiles.push({
     mesh, pos:startPos.clone(), vel:dir.multiplyScalar(m.def.projSpeed||12),
-    dmg: m.def.atk, life:2.5,
+    dmg: m.def.atk, life:2.5, sourceMonster:m,
   });
   SFX.shoot();
 }
@@ -2219,6 +2219,7 @@ function updateProjectiles(dt){
     const hitPlayer = player.alive && p.pos.distanceTo(playerState.pos) < 0.9 && Math.abs(p.pos.y-1.1) < 1.2;
     if(hitPlayer){
       if(!playerState.invulnerable){
+        if(p.sourceMonster && p.sourceMonster.alive) playerState.targetMonster = p.sourceMonster;
         const stats = getTotalStats();
         let dmg = Math.max(1, Math.round(p.dmg*rand(0.85,1.1) - stats.def*0.4));
         dmg = Math.max(1, Math.round(dmg*(1-getDamageReduction())));
@@ -3268,9 +3269,9 @@ function renderNPCContent(npc){
     boxLabel.textContent = '📦 장비 상자 (무작위 장비 1개)';
     const boxBuyBtn = document.createElement('button');
     boxBuyBtn.textContent = '구매 (100G)';
-    boxBuyBtn.disabled = player.gold < 100 || player.inventory.length >= MAX_INVENTORY;
+    boxBuyBtn.disabled = player.gold < 100 || getInventoryStackCount() >= MAX_INVENTORY;
     boxBuyBtn.onclick = ()=>{
-      if(player.gold < 100 || player.inventory.length >= MAX_INVENTORY) return;
+      if(player.gold < 100 || getInventoryStackCount() >= MAX_INVENTORY) return;
       player.gold -= 100;
       addItemToInventory(createRandomItem());
       refreshInventoryIfOpen();
@@ -4137,7 +4138,7 @@ canvas.addEventListener('pointerdown', (e)=>{
   const groundHits = raycaster.intersectObject(floorMesh);
   if(groundHits.length>0){
     playerState.moveTarget = groundHits[0].point.clone();
-    playerState.targetMonster = null;
+    // 이동을 위한 빈 땅 클릭으로는 현재 타겟(전투 중 상대)을 해제하지 않는다 - 몬스터 클릭/사망 시에만 해제됨
   }
 });
 
@@ -4297,6 +4298,8 @@ function updateMonsterBar(m){
 }
 
 function monsterAttackPlayer(m){
+  // 몬스터가 먼저 공격해와도 상태창에 표시되도록 현재 타겟으로 지정
+  playerState.targetMonster = m;
   if(playerState.invulnerable){
     const wp = playerState.pos.clone(); wp.y = 2.2;
     spawnDamageNumberAt(wp, '회피!', false, '#8ad8ff');
@@ -5083,6 +5086,17 @@ function invRarityRank(item){
   if(item.slot === 'rune') return RUNE_ORDER.indexOf(item.runeId);
   return RARITY_TIER[item.rarity] ?? 0;
 }
+// 스택 가능한 아이템(보석/룬)은 같은 종류+등급이 이미 있으면 용량을 추가로 소모하지 않는다
+function getInventoryStackCount(){
+  const keys = new Set();
+  player.inventory.forEach(item=>{ keys.add(getStackKey(item) || `single_${item.uid}`); });
+  return keys.size;
+}
+function inventoryHasRoomFor(item){
+  const key = getStackKey(item);
+  if(key && player.inventory.some(i=>getStackKey(i)===key)) return true;
+  return getInventoryStackCount() < MAX_INVENTORY;
+}
 function getSortedGroupedInventory(){
   const groups = new Map();
   const order = [];
@@ -5108,7 +5122,7 @@ function itemStatsText(item){
 
 function renderInventory(){
   const invHeader = document.querySelector('#inv-header h2');
-  if(invHeader) invHeader.innerHTML = `인벤토리 & 장비<span class="inv-count">${player.inventory.length}/${MAX_INVENTORY}</span>`;
+  if(invHeader) invHeader.innerHTML = `인벤토리 & 장비<span class="inv-count">${getInventoryStackCount()}/${MAX_INVENTORY}</span>`;
   const junkSelectEl = document.getElementById('junk-threshold-select');
   if(junkSelectEl && junkSelectEl.value !== player.junkThreshold) junkSelectEl.value = player.junkThreshold;
 
@@ -5414,7 +5428,7 @@ document.getElementById('btn-unequip').addEventListener('click', ()=>{
   const slot = selectedItem.from;
   const item = player.equipment[slot];
   if(!item) return;
-  if(player.inventory.length >= MAX_INVENTORY){ spawnToast('인벤토리가 가득 찼습니다','#888'); return; }
+  if(getInventoryStackCount() >= MAX_INVENTORY){ spawnToast('인벤토리가 가득 찼습니다','#888'); return; }
   player.equipment[slot] = null;
   player.inventory.push(item);
   selectedItem = { item, from:'inv' };
