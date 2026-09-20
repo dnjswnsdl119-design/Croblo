@@ -82,6 +82,7 @@
   .equip-slot{height:48px;border:1px dashed #555;border-radius:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:10px;color:#888;cursor:pointer;position:relative;background:rgba(255,255,255,0.025);transition:background 0.15s, border-color 0.15s;}
   .equip-slot:hover{background:rgba(255,255,255,0.07);}
   .equip-slot .slot-icon{position:absolute;top:3px;right:5px;font-size:11px;opacity:0.5;}
+  .slot-icon-img{width:13px;height:13px;vertical-align:middle;display:block;}
   .equip-slot .slot-label{position:absolute;top:3px;left:5px;font-size:9px;color:#666;}
   .equip-slot.filled{border-style:solid;box-shadow:inset 0 0 10px rgba(255,255,255,0.05);}
   .item-name-small{font-size:10px;text-align:center;padding:0 4px;line-height:1.2;}
@@ -661,6 +662,13 @@ const RARITY = {
 
 const SLOT_LABEL = { weapon:'무기', armor:'방어구', accessory:'장신구', helmet:'투구', gloves:'장갑', boots:'신발', belt:'벨트', rune:'룬', gem:'보석', fusion:'각인석', material:'재료' };
 const SLOT_ICON = { weapon:'⚔️', armor:'🛡️', accessory:'💍', helmet:'⛑️', gloves:'🧤', boots:'👢', belt:'🎗️', rune:'🔮', gem:'💎', fusion:'✨', material:'🧩' };
+// 장비 슬롯(무기/방어구/장신구/투구/장갑/신발/벨트)은 벡터 아이콘 이미지로 표시하고, 이미지가 없는 슬롯(룬/보석 등)은 기존 이모지를 그대로 쓴다.
+// 나중에 Higgsfield 등으로 제작한 실제 아트로 교체할 때는 이 경로의 파일만 바꾸면 된다 (docs/ai-art/HIGGSFIELD_PIPELINE.md 참고).
+const SLOT_ICON_IMAGE = { weapon:'assets/icons/weapon.svg', armor:'assets/icons/armor.svg', accessory:'assets/icons/accessory.svg', helmet:'assets/icons/helmet.svg', gloves:'assets/icons/gloves.svg', boots:'assets/icons/boots.svg', belt:'assets/icons/belt.svg' };
+function slotIconHtml(slot){
+  const img = SLOT_ICON_IMAGE[slot];
+  return img ? `<img src="${img}" class="slot-icon-img" alt="${SLOT_LABEL[slot]||''}">` : (SLOT_ICON[slot]||'');
+}
 const EQUIP_SLOTS = ['weapon','helmet','armor','gloves','belt','boots','accessory'];
 
 // 세트 아이템 정의: 각 부위별 고정 아이템 + 세트 보너스
@@ -5978,7 +5986,7 @@ function renderInventory(){
   document.querySelectorAll('.equip-slot').forEach(slotEl=>{
     const slot = slotEl.dataset.slot;
     const item = player.equipment[slot];
-    slotEl.innerHTML = `<span class="slot-label">${SLOT_LABEL[slot]}</span><span class="slot-icon">${SLOT_ICON[slot]||''}</span>`;
+    slotEl.innerHTML = `<span class="slot-label">${SLOT_LABEL[slot]}</span><span class="slot-icon">${slotIconHtml(slot)}</span>`;
     slotEl.classList.toggle('filled', !!item);
     slotEl.style.borderColor = item ? RARITY[item.rarity].color : '#555';
     if(item){
@@ -6015,7 +6023,7 @@ function renderInventory(){
       div.style.setProperty('--slot-tint', hexToRgba(rc, 0.16));
       const iconDiv = document.createElement('div');
       iconDiv.className = 'slot-icon';
-      iconDiv.textContent = SLOT_ICON[item.slot]||'';
+      iconDiv.innerHTML = slotIconHtml(item.slot);
       div.appendChild(iconDiv);
       const nameDiv = document.createElement('div');
       nameDiv.className = 'item-name-small';
