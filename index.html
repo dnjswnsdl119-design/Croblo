@@ -1305,7 +1305,7 @@ function getSellValue(item){
 // 직업 정의
 const CLASS_DEFS = {
   fighter: {
-    id:'fighter', name:'파이터', desc:'검과 방패를 다루는 근접 전사. 균형 잡힌 공수와 확실한 생존력.',
+    id:'fighter', name:'파이터', desc:'검과 방패를 다루는 근접 전사. 균형 잡힌 공수와 확실한 생존력.', spriteKey:'fighter',
     color:0x3a6ea5, ranged:false,
     base:{ hp:110, atk:12, def:7, crit:5, mp:60 },
     growth:{ hp:22, atk:3.2, def:2.0, crit:0.25, mp:6 },
@@ -1328,7 +1328,7 @@ const CLASS_DEFS = {
       desc:'전방으로 검기를 날려 경로상의 모든 적에게 지속 피해를 입힌다.' },
   },
   savage: {
-    id:'savage', name:'새비지', desc:'거대한 무기를 휘두르는 야성의 전사. 최고의 맷집과 지속 전투력.',
+    id:'savage', name:'새비지', desc:'거대한 무기를 휘두르는 야성의 전사. 최고의 맷집과 지속 전투력.', spriteKey:'savage',
     color:0x8a4a2a, ranged:false,
     base:{ hp:130, atk:11, def:8, crit:4, mp:55 },
     growth:{ hp:27, atk:2.8, def:2.4, crit:0.2, mp:5 },
@@ -1351,7 +1351,7 @@ const CLASS_DEFS = {
       desc:'전방으로 나아가며 포효의 화염 파동으로 경로상의 모든 적을 태운다.' },
   },
   valkyrie: {
-    id:'valkyrie', name:'발키리', desc:'창과 속도로 적을 베어내는 민첩한 전사. 높은 치명타와 기동력.',
+    id:'valkyrie', name:'발키리', desc:'창과 속도로 적을 베어내는 민첩한 전사. 높은 치명타와 기동력.', spriteKey:'valkyrie',
     color:0xaa4a8a, ranged:false,
     base:{ hp:95, atk:13, def:4, crit:9, mp:65 },
     growth:{ hp:18, atk:3.6, def:1.2, crit:0.55, mp:6 },
@@ -1374,7 +1374,7 @@ const CLASS_DEFS = {
       desc:'빛의 창기를 쏘아 보내 빠르게 나아가며 경로상의 모든 적을 연속 타격한다.' },
   },
   magician: {
-    id:'magician', name:'매지션', desc:'원소 마법으로 원거리에서 적을 제압하는 지혜의 마법사. 마법 공격은 적의 방어력을 무시합니다. 낮은 방어력에 주의.',
+    id:'magician', name:'매지션', desc:'원소 마법으로 원거리에서 적을 제압하는 지혜의 마법사. 마법 공격은 적의 방어력을 무시합니다. 낮은 방어력에 주의.', spriteKey:'magician',
     color:0x4a2a8a, ranged:true, range:8,
     base:{ hp:78, atk:14, def:2, crit:6, mp:110 },
     growth:{ hp:14, atk:4.2, def:0.8, crit:0.4, mp:12 },
@@ -1857,6 +1857,29 @@ function attachWeaponMesh(classId){
   updateWeaponVisual();
 }
 
+// 캐릭터/몬스터 2D 아트(Higgsfield 등으로 제작)를 3D 월드에 얹기 위한 스프라이트 로더.
+// 이 카메라는 회전 없는 고정 아이소메트릭 각도라 THREE.Sprite(항상 카메라를 향함)가 사실상 고정된 2D 컷아웃처럼 보인다.
+// SVG를 THREE.TextureLoader로 곧장 넘기면 브라우저/드라이버에 따라 WebGL 텍스처 업로드가 실패하는(texSubImage2D: bad image data) 문제가
+// 있어서, 캔버스 2D 컨텍스트에 먼저 래스터화한 뒤 그 캔버스로 텍스처를 만드는 표준 우회법을 쓴다.
+// docs/ai-art/HIGGSFIELD_PIPELINE.md 의 "엔진 통합" 절 참고.
+function loadSprite(path, widthWorldUnits, heightWorldUnits){
+  const mat = new THREE.SpriteMaterial({ transparent:true });
+  const sprite = new THREE.Sprite(mat);
+  sprite.scale.set(widthWorldUnits, heightWorldUnits, 1);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = img.naturalWidth || 128;
+    canvas.height = img.naturalHeight || 192;
+    canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+    mat.map = new THREE.CanvasTexture(canvas);
+    mat.needsUpdate = true;
+  };
+  img.src = path;
+  return sprite;
+}
+const CHARACTER_SPRITE_PATH = key => `assets/sprites/characters/${key}.svg`;
+
 function makePlayerMesh(){
   const g = new THREE.Group();
   const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.5,0.9,4,8), new THREE.MeshStandardMaterial({color:0x3a6ea5}));
@@ -1870,6 +1893,8 @@ function makePlayerMesh(){
   g.userData.weaponMesh = weapon;
   g.userData.mountMesh = mount;
   g.userData.bodyMesh = body;
+  g.userData.headMesh = head;
+  g.userData.classSprite = null;
   return g;
 }
 const playerMesh = makePlayerMesh();
@@ -5569,6 +5594,23 @@ function applyClassVisual(){
   if(!cls) return;
   playerMesh.userData.bodyMesh.material.color.set(cls.color);
   attachWeaponMesh(cls.id);
+  // 클래스에 매핑된 스프라이트 아트가 있으면 프리미티브 몸통/머리 대신 2D 캐릭터 아트를 보여준다.
+  // 아트가 없는 클래스는 기존 캡슐+구 프리미티브로 자연스럽게 폴백한다.
+  if(playerMesh.userData.classSprite){
+    playerMesh.remove(playerMesh.userData.classSprite);
+    playerMesh.userData.classSprite = null;
+  }
+  if(cls.spriteKey){
+    const sprite = loadSprite(CHARACTER_SPRITE_PATH(cls.spriteKey), 1.5, 2.25);
+    sprite.position.set(0, 1.1, 0);
+    playerMesh.add(sprite);
+    playerMesh.userData.classSprite = sprite;
+    playerMesh.userData.bodyMesh.visible = false;
+    playerMesh.userData.headMesh.visible = false;
+  } else {
+    playerMesh.userData.bodyMesh.visible = true;
+    playerMesh.userData.headMesh.visible = true;
+  }
 }
 
 function applySkillUI(){
