@@ -547,7 +547,7 @@
       <select id="junk-threshold-select" title="잡템 기준 등급 선택"></select>
       <button id="btn-identify-all">🔍 전체 감정</button>
       <button id="btn-auto-equip">⚡ 자동장착</button>
-      <button id="btn-sell-junk">🪙 잡템 정리</button>
+      <button id="btn-sell-junk">🔨 일괄분해</button>
       <button id="inv-close">✕</button>
     </div>
     <div id="inv-body">
@@ -1577,7 +1577,7 @@ function warnInventoryFull(){
   if(junkCount === 0) return;
   lastJunkPromptTime = now;
   junkPromptOpen = true;
-  showConfirm(`인벤토리가 가득 찼습니다. ${RARITY[player.junkThreshold].label} 등급 이하 잡템 ${junkCount}개를 지금 정리할까요?`, ()=>{
+  showConfirm(`인벤토리가 가득 찼습니다. ${RARITY[player.junkThreshold].label} 등급 이하 잡템 ${junkCount}개를 지금 분해할까요?`, ()=>{
     junkPromptOpen = false;
     sellJunkItems();
   }, ()=>{ junkPromptOpen = false; });
@@ -6408,16 +6408,37 @@ document.getElementById('btn-sell').addEventListener('click', ()=>{
   renderInventory(); renderDetail(); refreshHUD();
 });
 
-// 현재 설정된 잡템 기준(player.junkThreshold) 이하 등급 아이템을 한번에 판매
+// 잡템 일괄분해 보너스 재료: 등급이 높을수록 낮은 확률로 제작 재료가 추가로 나온다
+const DISASSEMBLE_MATERIAL_CHANCE = { rare:0.08, crafted:0.10, set:0.15, unique:0.25 };
+function rollDisassembleBonusMaterial(rarity){
+  const chance = DISASSEMBLE_MATERIAL_CHANCE[rarity] || 0;
+  if(Math.random() >= chance) return null;
+  const pool = rarity==='unique' ? ['relic','relic','fragment'] : rarity==='set' ? ['relic','fragment','fragment'] : ['fragment','leather'];
+  return choice(pool);
+}
+// 현재 설정된 잡템 기준(player.junkThreshold) 이하 등급 아이템을 한번에 분해: 골드+강화석을 함께 지급하고,
+// 등급이 높을수록 낮은 확률로 제작 재료도 보너스로 나온다 (판매 전용이었던 것을 분해로 통합)
 function sellJunkItems(){
   const maxTier = RARITY_TIER[player.junkThreshold];
   const junk = player.inventory.filter(i=>RARITY_TIER[i.rarity] !== undefined && RARITY_TIER[i.rarity] <= maxTier && i.identified !== false);
-  if(junk.length===0){ spawnToast('판매할 잡템이 없습니다', '#888'); return 0; }
-  const total = junk.reduce((sum,i)=>sum+(SELL_VALUE[i.rarity]||8),0);
+  if(junk.length===0){ spawnToast('분해할 잡템이 없습니다', '#888'); return 0; }
+  let totalGold = 0, totalStones = 0;
+  const bonusMaterials = {};
+  for(const item of junk){
+    totalGold += Math.round((SELL_VALUE[item.rarity]||8) * 0.5);
+    totalStones += DISASSEMBLE_YIELD[item.rarity]||1;
+    const mat = rollDisassembleBonusMaterial(item.rarity);
+    if(mat) bonusMaterials[mat] = (bonusMaterials[mat]||0)+1;
+  }
   const junkUids = new Set(junk.map(i=>i.uid));
   player.inventory = player.inventory.filter(i=>!junkUids.has(i.uid));
-  addGold(total);
-  spawnToast(`잡템 ${junk.length}개 판매: +${total}G`, '#e8c66a');
+  addGold(totalGold);
+  player.enhanceStones += totalStones;
+  for(const matId in bonusMaterials){
+    for(let i=0;i<bonusMaterials[matId];i++) addItemToInventory(createMaterialItem(matId));
+  }
+  const bonusText = Object.keys(bonusMaterials).length ? ` + ${Object.entries(bonusMaterials).map(([id,n])=>`${CRAFT_MATERIALS[id].name}x${n}`).join(', ')}` : '';
+  spawnToast(`잡템 ${junk.length}개 분해: 골드 +${totalGold}, 강화석 +${totalStones}${bonusText}`, '#8ad8ff');
   if(selectedItem && selectedItem.from==='inv' && !player.inventory.includes(selectedItem.item)) selectedItem = null;
   renderInventory(); renderDetail(); refreshHUD();
   return junk.length;
